@@ -1,8 +1,6 @@
-import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import { SKILL_ROOT } from '../paths.js';
+import { which, resolveAdb, bootedSimulators } from '../capture.js';
 
 const OK = '✓';
 const NO = '✗';
@@ -11,27 +9,6 @@ function row(ok, label, detail, hint) {
   const mark = ok ? OK : NO;
   const line = `  ${mark}  ${label.padEnd(20)}${detail}`;
   return hint && !ok ? `${line}\n${' '.repeat(28)}→ ${hint}` : line;
-}
-
-function which(bin) {
-  try {
-    return execFileSync('which', [bin], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  } catch {
-    return null;
-  }
-}
-
-/** PATH → Android SDK 기본 경로 순으로 adb를 찾는다. */
-export function resolveAdb() {
-  const onPath = which('adb');
-  if (onPath) return onPath;
-  const candidates = [
-    process.env.ANDROID_HOME && path.join(process.env.ANDROID_HOME, 'platform-tools', 'adb'),
-    process.env.ANDROID_SDK_ROOT && path.join(process.env.ANDROID_SDK_ROOT, 'platform-tools', 'adb'),
-    path.join(os.homedir(), 'Library/Android/sdk/platform-tools/adb'),
-    path.join(os.homedir(), 'Android/Sdk/platform-tools/adb'),
-  ].filter(Boolean);
-  return candidates.find((p) => existsSync(p)) ?? null;
 }
 
 export async function run() {
@@ -80,7 +57,11 @@ export async function run() {
 
   // 4) iOS 시뮬레이터 캡처 (선택 기능)
   const hasSimctl = process.platform === 'darwin' && Boolean(which('xcrun'));
-  lines.push(row(hasSimctl, 'xcrun simctl', hasSimctl ? 'available' : 'not available',
+  const booted = hasSimctl ? bootedSimulators() : [];
+  lines.push(row(hasSimctl, 'xcrun simctl',
+    hasSimctl
+      ? (booted.length ? `booted: ${booted.map((d) => d.name).join(', ')}` : 'available (부팅된 기기 없음)')
+      : 'not available',
     'iOS 자동 캡처만 불가 — PNG를 screens/에 직접 넣으면 됩니다'));
 
   // 5) Android 캡처 (선택 기능)
