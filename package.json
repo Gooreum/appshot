@@ -1,0 +1,16 @@
+{
+  "name": "appshot",
+  "version": "0.1.0",
+  "description": "App Store / Play Store marketing screenshot generator — device mockups, layouts, exact store specs.",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "appshot": "bin/appshot.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "playwright": "^1.63.0"
+  }
+}
