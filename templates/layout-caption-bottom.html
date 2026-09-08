@@ -1,0 +1,35 @@
+<style>
+  /*
+   * 상단 디바이스 + 하단 카피.
+   * 디바이스가 위에서 잘리므로 화면 상단 UI(헤더·네비게이션)가
+   * 캔버스 최상단에 붙어 보인다. 앱의 첫인상을 보여줄 때 쓴다.
+   */
+  .stage--caption-bottom {
+    justify-content: flex-end;
+    padding-bottom: calc(var(--safe-bottom) * 1.6);
+  }
+
+  .stage--caption-bottom .device-area {
+    align-items: flex-end;
+    padding-bottom: calc(var(--u) * 6);
+    overflow: visible;
+  }
+
+  /* 화면 상단이 캔버스 밖으로 나가도록 위로 밀어 올린다 */
+  .stage--caption-bottom .device {
+    margin-top: calc(var(--u) * -14);
+  }
+</style>
+
+<div class="bg"></div>
+<div class="noise"></div>
+
+<div class="stage stage--caption-bottom">
+  <div class="device-area">
+    {{{device}}}
+  </div>
+  <div class="copy">
+    <h1 class="headline">{{headline}}</h1>
+    {{#subhead}}<p class="subhead">{{subhead}}</p>{{/subhead}}
+  </div>
+</div>

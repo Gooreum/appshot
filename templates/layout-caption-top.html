@@ -1,0 +1,29 @@
+<style>
+  /*
+   * 상단 카피 + 하단 디바이스.
+   * 디바이스는 아래로 흘러넘쳐 캔버스 하단에서 잘린다 —
+   * "화면이 계속 이어진다"는 인상을 주고, 카피가 차지할 공간도 확보된다.
+   */
+  .stage--caption-top {
+    padding-top: var(--safe-top);
+  }
+
+  .stage--caption-top .device-area {
+    align-items: flex-start;
+    padding-top: calc(var(--u) * 6);
+    overflow: visible;
+  }
+</style>
+
+<div class="bg"></div>
+<div class="noise"></div>
+
+<div class="stage stage--caption-top">
+  <div class="copy">
+    <h1 class="headline">{{headline}}</h1>
+    {{#subhead}}<p class="subhead">{{subhead}}</p>{{/subhead}}
+  </div>
+  <div class="device-area">
+    {{{device}}}
+  </div>
+</div>

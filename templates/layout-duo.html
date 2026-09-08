@@ -1,0 +1,55 @@
+<style>
+  /*
+   * 디바이스 2대 겹침 — 두 화면의 흐름을 한 장에 담는다.
+   * 뒤쪽 기기는 작게·흐리게·기울여서 확실히 뒤로 물러나게 한다.
+   * 두 기기가 같은 크기면 시선이 어디로 가야 할지 알 수 없다.
+   */
+  .stage--duo {
+    padding-top: var(--safe-top);
+  }
+
+  .stage--duo .device-area {
+    align-items: flex-start;
+    padding-top: calc(var(--u) * 5);
+    overflow: visible;
+  }
+
+  .duo {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .duo-back {
+    position: relative;
+    z-index: 1;
+    transform: translate(calc(var(--u) * 13), calc(var(--u) * -1)) scale(0.86) rotate(-5deg);
+    transform-origin: top center;
+    filter: brightness(0.82) saturate(0.9);
+  }
+
+  .duo-front {
+    position: relative;
+    z-index: 2;
+    transform: translate(calc(var(--u) * -13), calc(var(--u) * 7)) rotate(2deg);
+    transform-origin: top center;
+  }
+</style>
+
+<div class="bg"></div>
+<div class="noise"></div>
+
+<div class="stage stage--duo">
+  <div class="copy">
+    <h1 class="headline">{{headline}}</h1>
+    {{#subhead}}<p class="subhead">{{subhead}}</p>{{/subhead}}
+  </div>
+  <div class="device-area">
+    <div class="duo">
+      <div class="duo-back">{{{device2}}}</div>
+      <div class="duo-front">{{{device}}}</div>
+    </div>
+  </div>
+</div>

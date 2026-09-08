@@ -1,0 +1,55 @@
+<style>
+  /*
+   * 풀블리드 — 앱 화면이 캔버스를 가득 채우고 카피가 그 위에 얹힌다.
+   * 프레임을 쓰지 않으므로 앱 UI 자체가 완성도 높을 때만 통한다.
+   *
+   * 마스크는 두 겹이다: 아래로 갈수록 짙어지는 그라디언트 + 아주 약한
+   * 전체 틴트. 한 겹만 쓰면 밝은 스크린샷에서 흰 글씨가 날아간다.
+   */
+  .fullbleed-screen {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+  }
+
+  .fullbleed-mask {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    background:
+      linear-gradient(180deg,
+        rgba(0, 0, 0, 0.28) 0%,
+        rgba(0, 0, 0, 0) 24%,
+        rgba(0, 0, 0, 0) 44%,
+        rgba(0, 0, 0, 0.62) 74%,
+        rgba(0, 0, 0, 0.86) 100%);
+  }
+
+  .stage--fullbleed {
+    justify-content: flex-end;
+    padding-bottom: calc(var(--safe-bottom) * 2.2);
+  }
+
+  .stage--fullbleed .copy {
+    text-align: left;
+  }
+
+  .stage--fullbleed .headline {
+    text-shadow: 0 calc(var(--u) * 0.2) calc(var(--u) * 1.2) rgba(0, 0, 0, 0.45);
+  }
+</style>
+
+<img class="fullbleed-screen" src="{{screenSrc}}" alt="">
+<div class="fullbleed-mask"></div>
+<div class="noise"></div>
+
+<div class="stage stage--fullbleed">
+  <div class="copy">
+    <h1 class="headline">{{headline}}</h1>
+    {{#subhead}}<p class="subhead">{{subhead}}</p>{{/subhead}}
+  </div>
+</div>

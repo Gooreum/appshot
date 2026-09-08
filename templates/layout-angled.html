@@ -1,0 +1,49 @@
+<style>
+  /*
+   * 기울인 디바이스 + 하단 카피.
+   * -8도는 의도적으로 작은 각도다. 15도를 넘으면 화면 내용이
+   * 읽히지 않고 "템플릿으로 찍어낸" 인상이 강해진다.
+   */
+  .stage--angled {
+    padding-top: var(--safe-top);
+    justify-content: space-between;
+    padding-bottom: calc(var(--safe-bottom) * 1.4);
+  }
+
+  .stage--angled .device-area {
+    align-items: center;
+    overflow: visible;
+  }
+
+  .stage--angled .device {
+    transform: rotate(-8deg) translateY(calc(var(--u) * 2));
+    transform-origin: center center;
+  }
+
+  /* 기울인 만큼 그림자도 같은 방향으로 눕는다 */
+  .stage--angled .device::after {
+    content: '';
+    position: absolute;
+    left: 6%;
+    right: 6%;
+    bottom: calc(var(--u) * -3);
+    height: calc(var(--u) * 6);
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.28);
+    filter: blur(calc(var(--u) * 3));
+    z-index: -2;
+  }
+</style>
+
+<div class="bg"></div>
+<div class="noise"></div>
+
+<div class="stage stage--angled">
+  <div class="device-area">
+    {{{device}}}
+  </div>
+  <div class="copy">
+    <h1 class="headline">{{headline}}</h1>
+    {{#subhead}}<p class="subhead">{{subhead}}</p>{{/subhead}}
+  </div>
+</div>
