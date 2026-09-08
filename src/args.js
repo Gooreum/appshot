@@ -5,7 +5,7 @@
  * 값이 없는 플래그(--preview, --json)는 boolean true가 된다.
  * --only 는 쉼표 구분 정수 배열로, --scale 은 수로 정규화한다.
  */
-const BOOLEAN_FLAGS = new Set(['preview', 'json', 'force', 'help', 'quiet']);
+const BOOLEAN_FLAGS = new Set(['preview', 'json', 'force', 'help', 'quiet', 'placeholder']);
 const NUMBER_LIST_FLAGS = new Set(['only']);
 
 export function parseArgs(argv) {

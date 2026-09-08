@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { skillPath } from './paths.js';
 import { frameCSS, frameHTML } from './frame.js';
-import { getLayout } from './layouts.js';
+import { getLayout, frameWidthFor } from './layouts.js';
 
 /*
  * 템플릿 → 완전한 HTML 문서.
@@ -37,7 +37,7 @@ export function buildHTML({ cfg, screen, device, index = 0, total = 1, images = 
     throw new Error(`screens[${index}]의 화면 이미지가 없습니다: ${screen.source}`);
   }
 
-  const frameW = Math.round(canvas.w * layout.frameWidth);
+  const frameW = frameWidthFor(device, layout, canvas);
   const usesFrame = screen.layout !== 'fullbleed';
 
   const imgTag = (src) => `<img class="screen" src="${src}" alt="">`;

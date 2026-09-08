@@ -16,22 +16,31 @@
     object-position: top center;
   }
 
+  /*
+   * 마스크는 하단에 집중시킨다.
+   * 상단까지 틴트를 깔면 앱 화면 전체가 탁해 보인다 — 풀블리드를 고른
+   * 이유가 앱 UI를 보여주려는 것이므로 위쪽은 거의 건드리지 않는다.
+   *
+   * 하단은 충분히 진해야 한다. 앱 하단 탭바는 대개 밝은 회색이라
+   * 0.6 정도의 검정으로는 카피 뒤에서 그대로 비쳐 보인다.
+   */
   .fullbleed-mask {
     position: absolute;
     inset: 0;
     z-index: 2;
     background:
       linear-gradient(180deg,
-        rgba(0, 0, 0, 0.28) 0%,
-        rgba(0, 0, 0, 0) 24%,
-        rgba(0, 0, 0, 0) 44%,
-        rgba(0, 0, 0, 0.62) 74%,
-        rgba(0, 0, 0, 0.86) 100%);
+        rgba(0, 0, 0, 0.08) 0%,
+        rgba(0, 0, 0, 0) 14%,
+        rgba(0, 0, 0, 0) 42%,
+        rgba(0, 0, 0, 0.45) 62%,
+        rgba(0, 0, 0, 0.82) 78%,
+        rgba(0, 0, 0, 0.95) 100%);
   }
 
   .stage--fullbleed {
     justify-content: flex-end;
-    padding-bottom: calc(var(--safe-bottom) * 2.2);
+    padding-bottom: calc(var(--safe-bottom) * 3.4);
   }
 
   .stage--fullbleed .copy {
