@@ -19,13 +19,13 @@ export function defaultConfig({ platform = 'ios', device = 'iphone-17-pro-max' }
       background: {
         type: 'gradient',
         from: '#4F46E5',
-        to: '#0EA5E9',
+        to: '#0E7490',   // 더 밝은 시안(#0EA5E9)은 흰 글씨 대비가 2.75:1로 기준 미달
         angle: 160,
         noise: true,      // 그라디언트 밴딩 제거
         panorama: false,  // true면 배경이 여러 장에 걸쳐 이어진다
       },
       headline: { color: '#FFFFFF', size: 0.056, weight: 800 },
-      subhead: { color: 'rgba(255,255,255,0.74)', size: 0.029, weight: 500 },
+      subhead: { color: 'rgba(255,255,255,0.86)', size: 0.029, weight: 500 },
       fontStack: FONT_STACK,
     },
     screens: [

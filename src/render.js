@@ -4,6 +4,7 @@ import { chromium } from 'playwright';
 import { getDevice } from './devices.js';
 import { getLayout } from './layouts.js';
 import { buildHTML } from './html.js';
+import { checkAll } from './quality.js';
 
 const MIME = {
   '.png': 'image/png',
@@ -25,8 +26,13 @@ const PREVIEW_SCALE = 0.34;
  * deviceScaleFactor를 지정하지 않으면 환경에 따라 2배 크기로 나오는데,
  * 이것이 스토어 스크린샷 리젝의 가장 흔한 원인이다.
  */
-export async function renderAll(cfg, { preview = false, only = null, placeholder = false, cwd = process.cwd(), onProgress } = {}) {
+export async function renderAll(cfg, { preview = false, only = null, placeholder = false, cwd = process.cwd(), onProgress, onWarnings } = {}) {
   const device = getDevice(cfg.device);
+
+  // 품질 점검은 렌더를 막지 않는다 — 의도적으로 규칙을 깨는 디자인도 있고,
+  // 결과를 눈으로 보기 전에 차단하면 판단할 기회가 사라진다.
+  const warnings = checkAll(cfg, device, cwd);
+  if (warnings.length) onWarnings?.(warnings);
   const scale = preview ? PREVIEW_SCALE : 1;
   const canvas = preview
     ? { w: Math.round(device.canvas.w * scale), h: Math.round(device.canvas.h * scale) }
@@ -90,7 +96,7 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
     await browser.close(); // 렌더가 중간에 실패해도 좀비 프로세스를 남기지 않는다
   }
 
-  return { results, outDir, canvas, device, preview };
+  return { results, outDir, canvas, device, preview, warnings };
 }
 
 /** 이미지 파일을 data URI로 읽는다. setContent에는 baseURL이 없어 상대 경로가 통하지 않는다. */

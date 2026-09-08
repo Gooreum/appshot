@@ -2,20 +2,22 @@ import path from 'node:path';
 import { loadConfig } from '../config.js';
 import { renderAll } from '../render.js';
 import { canvasLabel } from '../devices.js';
+import { printWarnings } from '../quality.js';
 
 export async function run({ opts }) {
   const cwd = process.cwd();
   const cfg = loadConfig(cwd);
+  console.log('');
 
   const only = Array.isArray(opts.only) ? opts.only : null;
   const preview = Boolean(opts.preview);
 
-  console.log('');
   const { results, outDir, canvas, device } = await renderAll(cfg, {
     preview,
     only,
     placeholder: Boolean(opts.placeholder),
     cwd,
+    onWarnings: printWarnings,
     onProgress: (r) => {
       const name = path.basename(r.file);
       console.log(`  ${name}  ${r.layout.padEnd(15)} ${kb(r.bytes)}`);
