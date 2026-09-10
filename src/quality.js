@@ -213,8 +213,10 @@ function checkSource(screen, cfg, device, layout, cwd, i, add) {
  * 이것 때문에 이미지 디코딩 라이브러리를 들일 이유는 없다 — 헤더면 충분하다.
  */
 export function imageSize(file) {
-  const buf = fs.readFileSync(file);
+  return sizeFromBuffer(fs.readFileSync(file));
+}
 
+function sizeFromBuffer(buf) {
   // PNG: 8바이트 시그니처 + IHDR 길이/타입(8) → 오프셋 16부터 width, height
   if (buf.length > 24 && buf.toString('hex', 0, 8) === '89504e470d0a1a0a') {
     return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
@@ -236,6 +238,46 @@ export function imageSize(file) {
   }
 
   return null; // webp 등은 판정하지 않는다 — 모르면 경고하지 않는 편이 낫다
+}
+
+/** 끝맺음 마커를 찾는 범위. 마커 뒤에 패딩·트레일러를 붙이는 도구가 있어 마지막 바이트만 보면 오탐한다. */
+const TAIL_WINDOW = 1024;
+
+/**
+ * 이미지 내용이 온전한지 검증한다.
+ *
+ * 확장자는 아무나 붙일 수 있다. 0바이트 파일, 전송 중 잘린 파일, 이름만 .png인 텍스트 파일이
+ * 렌더를 그대로 통과해 찌그러진 결과물이 스토어에 올라가는 것보다 여기서 막는 편이 낫다.
+ *
+ * 문제가 있으면 이유를 담은 Error를 던진다.
+ */
+export function validateImage(buf) {
+  if (buf.length === 0) throw new Error('파일이 비어 있습니다 (0바이트).');
+
+  const isPNG = buf.length > 8 && buf.toString('hex', 0, 8) === '89504e470d0a1a0a';
+  const isJPEG = buf.length > 4 && buf[0] === 0xff && buf[1] === 0xd8;
+  const isWebP = buf.length > 12 &&
+    buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP';
+
+  if (!isPNG && !isJPEG && !isWebP) {
+    throw new Error('PNG/JPEG/WebP 형식이 아닙니다 (파일 내용이 이미지가 아님).');
+  }
+
+  // 잘린 파일은 헤더가 멀쩡해서 끝부분으로만 잡힌다
+  const tail = buf.subarray(-TAIL_WINDOW);
+  if (isPNG && tail.indexOf('IEND') === -1) {
+    throw new Error('PNG가 손상되었거나 잘렸습니다 (IEND 청크 없음).');
+  }
+  if (isJPEG && tail.indexOf(Buffer.from([0xff, 0xd9])) === -1) {
+    throw new Error('JPEG가 손상되었거나 잘렸습니다 (EOI 마커 없음).');
+  }
+  if (isWebP && buf.readUInt32LE(4) + 8 > buf.length) {
+    throw new Error('WebP가 손상되었거나 잘렸습니다 (RIFF 크기 불일치).');
+  }
+
+  if (isWebP) return; // WebP 크기 파싱은 하지 않는다 — 형식·잘림 확인까지만
+  const size = sizeFromBuffer(buf);
+  if (!size?.w || !size?.h) throw new Error('이미지 크기를 읽을 수 없습니다 (헤더 손상).');
 }
 
 /** 경고를 사람이 읽는 형태로 출력한다. */

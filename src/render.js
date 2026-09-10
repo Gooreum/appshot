@@ -4,7 +4,7 @@ import { chromium } from 'playwright';
 import { getDevice } from './devices.js';
 import { getLayout } from './layouts.js';
 import { buildHTML } from './html.js';
-import { checkAll } from './quality.js';
+import { checkAll, validateImage } from './quality.js';
 
 const MIME = {
   '.png': 'image/png',
@@ -119,7 +119,20 @@ function readImage(source, cwd, device, placeholder, screenNo) {
     throw new Error(`지원하지 않는 이미지 형식입니다: ${source} (png/jpg/webp만 가능)`);
   }
 
-  return `data:${mime};base64,${fs.readFileSync(file).toString('base64')}`;
+  // 확장자만 믿지 않는다. 깨진 파일은 --placeholder여도 자리표시자로 덮지 않는다 —
+  // "화면이 아직 없다"와 "있는 줄 알았는데 깨졌다"는 다른 사고고, 후자를 덮으면 사용자가 영영 모른다.
+  const buf = fs.readFileSync(file);
+  try {
+    validateImage(buf);
+  } catch (err) {
+    throw new Error(
+      `앱 화면을 읽을 수 없습니다: ${source}\n` +
+        `  ${err.message}\n` +
+        `  파일을 다시 만들거나 다른 화면을 지정하세요.`,
+    );
+  }
+
+  return `data:${mime};base64,${buf.toString('base64')}`;
 }
 
 /**
