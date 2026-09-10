@@ -4,7 +4,7 @@ import { chromium } from 'playwright';
 import { getDevice } from './devices.js';
 import { getLayout } from './layouts.js';
 import { buildHTML } from './html.js';
-import { checkAll, validateImage } from './quality.js';
+import { checkAll, checkCopyArea, validateImage } from './quality.js';
 
 const MIME = {
   '.png': 'image/png',
@@ -31,8 +31,8 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
 
   // 품질 점검은 렌더를 막지 않는다 — 의도적으로 규칙을 깨는 디자인도 있고,
   // 결과를 눈으로 보기 전에 차단하면 판단할 기회가 사라진다.
+  // 카피 면적처럼 렌더해야 알 수 있는 경고가 뒤에 붙으므로 출력은 렌더 후 한 번에 한다.
   const warnings = checkAll(cfg, device, cwd);
-  if (warnings.length) onWarnings?.(warnings);
   const scale = preview ? PREVIEW_SCALE : 1;
   const canvas = preview
     ? { w: Math.round(device.canvas.w * scale), h: Math.round(device.canvas.h * scale) }
@@ -84,6 +84,9 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
       await page.setContent(html, { waitUntil: 'load' });
       await page.evaluate(() => document.fonts.ready); // FOUT 상태로 캡처되는 것 방지
 
+      const area = checkCopyArea(cfg, index, await copyAreaRatio(page));
+      if (area) warnings.push(area);
+
       const file = path.join(outDir, `${String(index + 1).padStart(2, '0')}.png`);
       await page.screenshot({ path: file, type: 'png' });
 
@@ -96,7 +99,33 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
     await browser.close(); // 렌더가 중간에 실패해도 좀비 프로세스를 남기지 않는다
   }
 
+  if (warnings.length) onWarnings?.(warnings);
   return { results, outDir, canvas, device, preview, warnings };
+}
+
+/**
+ * 헤드라인·서브카피가 캔버스에서 차지하는 비율.
+ *
+ * Google Play는 "20%"를 어떻게 재는지 정의하지 않는다. 글자 줄 조각만 감싸는 사각형으로 재면
+ * text-wrap: balance가 줄 폭을 좁혀서 7줄짜리 카피도 15%로 나온다 — 너무 관대하다.
+ * 카피가 놓인 가로 띠는 좌우 여백까지 앱 화면이 쓸 수 없으므로,
+ * 첫 줄 위부터 마지막 줄 아래까지의 높이를 캔버스 높이로 나눈 "띠" 비율로 잰다.
+ * 비율이라 --preview 축소 렌더에서도 같은 값이 나온다.
+ */
+function copyAreaRatio(page) {
+  return page.evaluate(() => {
+    let top = Infinity, bottom = -Infinity;
+    for (const el of document.querySelectorAll('.headline, .subhead')) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      for (const r of range.getClientRects()) {
+        top = Math.min(top, r.top);
+        bottom = Math.max(bottom, r.bottom);
+      }
+    }
+    if (bottom < top) return 0; // 카피가 없다
+    return (bottom - top) / innerHeight;
+  });
 }
 
 /** 이미지 파일을 data URI로 읽는다. setContent에는 baseURL이 없어 상대 경로가 통하지 않는다. */

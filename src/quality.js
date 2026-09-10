@@ -31,6 +31,9 @@ const CJK = /[ᄀ-ᇿ㄰-㆏가-힯぀-ヿ一-鿿]/;
 const MAX_SCREENS = { ios: 10, android: 8 };
 const PLAY_RECOMMEND_MIN = 4;
 
+/** 카피가 이미지에서 차지해도 되는 최대 면적 (Google Play: "not more than 20% of the image"). */
+const COPY_AREA_MAX = 0.2;
+
 export function checkAll(cfg, device, cwd = process.cwd()) {
   const warnings = [];
   // index가 null이면 특정 장이 아니라 설정 전체에 대한 경고다
@@ -178,6 +181,20 @@ function checkTabletText(cfg, add) {
   add(null, 'tablet-text',
     'Google Play는 태블릿·크롬북 스크린샷에서 앱 화면이 아닌 텍스트를 빼라고 권장합니다 (홈 화면에서 잘릴 수 있음). ' +
       'headline/subhead를 비우는 것을 고려하세요.');
+}
+
+/**
+ * 카피 면적 경고. 줄바꿈 결과는 브라우저만 알기 때문에 렌더 중에 잰 비율을 받는다.
+ * Google Play 기준이라 Android에만 적용한다.
+ */
+export function checkCopyArea(cfg, index, ratio) {
+  if (cfg.platform !== 'android' || !(ratio > COPY_AREA_MAX)) return null;
+  return {
+    level: 'warn',
+    screen: index + 1,
+    code: 'copy-area',
+    message: `카피가 이미지의 ${(ratio * 100).toFixed(0)}%를 차지합니다 (Google Play 기준 ${COPY_AREA_MAX * 100}% 이하). 문구를 줄이세요.`,
+  };
 }
 
 // ── 대비 ────────────────────────────────────────────────────────────────
