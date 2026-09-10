@@ -92,6 +92,7 @@ body {
   color: var(--headline-color, #fff);
   text-wrap: balance;
   word-break: keep-all; /* 한글이 어절 중간에서 끊기지 않게 */
+  overflow-wrap: anywhere; /* 단, 한 어절이 줄보다 길면 넘치지 말고 끊는다 */
 }
 
 .subhead {
@@ -103,6 +104,7 @@ body {
   color: var(--subhead-color, rgba(255, 255, 255, 0.74));
   text-wrap: balance;
   word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 .device-area {
