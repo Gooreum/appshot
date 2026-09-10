@@ -13,10 +13,16 @@
     padding-bottom: calc(var(--safe-bottom) * 1.6);
   }
 
+  /* 카피가 아래에 있으므로 기기는 남은 높이 안에 들어가야 한다 (layout-angled.html 참고) */
   .stage--caption-bottom .device-area {
     align-items: flex-start;
     padding-bottom: calc(var(--u) * 6);
     overflow: visible;
+    container-type: size;
+  }
+
+  .stage--caption-bottom .device {
+    width: min(var(--device-w), calc(100cqh / var(--device-hpw)));
   }
 </style>
 

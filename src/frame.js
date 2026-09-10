@@ -38,12 +38,7 @@ export function frameCSS(device, W) {
   padding: ${px(padTop)} ${px(bezel)} ${px(padBottom)};
   border-radius: ${px(W * f.radius)};
   background: ${material};
-  /* 접지(contact) / 주광(key) / 환경광(ambient) 3단 그림자 —
-     한 겹짜리 그림자는 스티커처럼 보인다 */
-  box-shadow:
-    0 ${px(W * 0.012)} ${px(W * 0.028)} rgba(0,0,0,.22),
-    0 ${px(W * 0.055)} ${px(W * 0.110)} rgba(0,0,0,.28),
-    0 ${px(W * 0.160)} ${px(W * 0.300)} rgba(0,0,0,.20);
+  ${shadowCSS(W)}
 }
 
 /* 프레임 안쪽 미세한 하이라이트 — 금속 테두리의 광택 */
@@ -209,6 +204,61 @@ function buttonsCSS(buttons, W, radius) {
     .filter(Boolean);
 
   return `\n${rules.join('\n')}`;
+}
+
+/**
+ * 접지(contact) / 주광(key) / 환경광(ambient) 3단 그림자 —
+ * 한 겹짜리 그림자는 스티커처럼 보인다.
+ */
+function shadowCSS(W) {
+  return `box-shadow:
+    0 ${px(W * 0.012)} ${px(W * 0.028)} rgba(0,0,0,.22),
+    0 ${px(W * 0.055)} ${px(W * 0.110)} rgba(0,0,0,.28),
+    0 ${px(W * 0.160)} ${px(W * 0.300)} rgba(0,0,0,.20);`;
+}
+
+/** 프레임 없는 카드의 모서리 반경 (카드 폭 대비). 기기 화면 곡률보다 작게 둬서 폰처럼 보이지 않게 한다. */
+const PLAIN_RADIUS = 0.05;
+
+/**
+ * 기기 없이 앱 화면만 둥근 카드로 보여주는 CSS.
+ *
+ * Google Play는 폰 스크린샷에 기기 이미지를 피하라고 권장한다
+ * ("can become obsolete quickly or alienate some users").
+ * 클래스명을 .device로 유지해서 레이아웃 템플릿의 회전·겹침 규칙을 그대로 쓴다.
+ */
+export function plainCSS(W) {
+  const radius = px(W * PLAIN_RADIUS);
+  return `
+.device {
+  position: relative;
+  width: ${px(W)};
+  border-radius: ${radius};
+  ${shadowCSS(W)}
+}
+
+.screen-clip {
+  position: relative;
+  overflow: hidden;
+  border-radius: ${radius};
+  line-height: 0;
+  background: #000;
+}
+
+.screen {
+  display: block;
+  width: 100%;
+  object-fit: cover;
+}`.trim();
+}
+
+/** 프레임 없는 카드 마크업. */
+export function plainHTML(screenImgTag) {
+  return `<div class="device device--plain">
+  <div class="screen-clip">
+    ${screenImgTag}
+  </div>
+</div>`;
 }
 
 /** 프레임 마크업. img 태그 문자열을 받아 화면 자리에 넣는다. */

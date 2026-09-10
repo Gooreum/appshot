@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { skillPath } from './paths.js';
-import { frameCSS, frameHTML } from './frame.js';
-import { getLayout, frameWidthFor } from './layouts.js';
+import { frameCSS, frameHTML, plainCSS, plainHTML } from './frame.js';
+import { getLayout, frameWidthFor, heightPerWidth } from './layouts.js';
 
 /*
  * 템플릿 → 완전한 HTML 문서.
@@ -37,16 +37,19 @@ export function buildHTML({ cfg, screen, device, index = 0, total = 1, images = 
     throw new Error(`screens[${index}]의 화면 이미지가 없습니다: ${screen.source}`);
   }
 
-  const frameW = frameWidthFor(device, layout, canvas);
-  const usesFrame = screen.layout !== 'fullbleed';
+  // 필드가 없으면 기기 프레임 — deviceFrame이 생기기 전에 만든 config와 호환
+  const framed = cfg.theme.deviceFrame !== false;
+  const frameW = frameWidthFor(device, layout, canvas, { framed });
+  const usesDevice = screen.layout !== 'fullbleed';
 
   const imgTag = (src) => `<img class="screen" src="${src}" alt="">`;
+  const wrap = (src) => (framed ? frameHTML(device, imgTag(src)) : plainHTML(imgTag(src)));
   const body = render(template(layout.template), {
     headline: screen.headline ?? '',
     subhead: screen.subhead ?? '',
     screenSrc: images.main,
-    device: usesFrame ? frameHTML(device, imgTag(images.main)) : '',
-    device2: images.second ? frameHTML(device, imgTag(images.second)) : '',
+    device: usesDevice ? wrap(images.main) : '',
+    device2: images.second ? wrap(images.second) : '',
   });
 
   return `<!doctype html>
@@ -64,10 +67,12 @@ export function buildHTML({ cfg, screen, device, index = 0, total = 1, images = 
   --subhead-color: ${cfg.theme.subhead.color};
   --subhead-weight: ${cfg.theme.subhead.weight ?? 500};
   --subhead-scale: ${(cfg.theme.subhead.size ?? 0.029) * 100};
+  --device-w: ${frameW}px;
+  --device-hpw: ${heightPerWidth(device, layout, { framed }).toFixed(5)};
 }
 ${baseCSS()}
 ${backgroundCSS(cfg.theme.background, index, total)}
-${usesFrame ? frameCSS(device, frameW) : ''}
+${usesDevice ? (framed ? frameCSS(device, frameW) : plainCSS(frameW)) : ''}
 </style>
 </head>
 <body>

@@ -27,29 +27,43 @@ export function defaultConfig({ platform = 'ios', device = 'iphone-17-pro-max' }
       headline: { color: '#FFFFFF', size: 0.056, weight: 800 },
       subhead: { color: 'rgba(255,255,255,0.86)', size: 0.029, weight: 500 },
       fontStack: FONT_STACK,
+      // Google Play는 폰 스크린샷에 기기 이미지를 피하라고 권장한다 (App Store는 허용)
+      deviceFrame: platform !== 'android',
     },
-    screens: [
-      {
-        source: 'screens/01.png',
-        layout: 'caption-top',
-        headline: '3초 만에 기록',
-        subhead: '복잡한 설정 없이 바로 시작하세요',
-      },
-      {
-        source: 'screens/02.png',
-        layout: 'caption-bottom',
-        headline: '한눈에 보는 흐름',
-        subhead: '쌓인 기록이 자동으로 정리됩니다',
-      },
-      {
-        source: 'screens/03.png',
-        layout: 'angled',
-        headline: '어디서든 이어보기',
-        subhead: '모든 기기에서 실시간으로 동기화',
-      },
-    ],
+    // Play 추천 영역에 노출되려면 스크린샷이 4장 이상이어야 한다
+    // 호출마다 새 객체 — 반환된 config를 고쳐도 다음 기본값에 번지지 않게
+    screens: (platform === 'android' ? [...BASE_SCREENS, ANDROID_EXTRA_SCREEN] : BASE_SCREENS)
+      .map((s) => ({ ...s })),
   };
 }
+
+const BASE_SCREENS = [
+  {
+    source: 'screens/01.png',
+    layout: 'caption-top',
+    headline: '3초 만에 기록',
+    subhead: '복잡한 설정 없이 바로 시작하세요',
+  },
+  {
+    source: 'screens/02.png',
+    layout: 'caption-bottom',
+    headline: '한눈에 보는 흐름',
+    subhead: '쌓인 기록이 자동으로 정리됩니다',
+  },
+  {
+    source: 'screens/03.png',
+    layout: 'angled',
+    headline: '어디서든 이어보기',
+    subhead: '모든 기기에서 실시간으로 동기화',
+  },
+];
+
+const ANDROID_EXTRA_SCREEN = {
+  source: 'screens/04.png',
+  layout: 'fullbleed',
+  headline: '오늘부터 가볍게',
+  subhead: '기록은 짧게, 정리는 자동으로',
+};
 
 /**
  * config를 검증하고 문제 목록을 반환한다.
@@ -114,6 +128,9 @@ export function validateConfig(cfg) {
     if (!t.background || typeof t.background !== 'object') push('theme.background가 없습니다.');
     if (!t.headline || typeof t.headline !== 'object') push('theme.headline이 없습니다.');
     if (!t.subhead || typeof t.subhead !== 'object') push('theme.subhead가 없습니다.');
+    if (t.deviceFrame !== undefined && typeof t.deviceFrame !== 'boolean') {
+      push('theme.deviceFrame은 true/false여야 합니다.');
+    }
   }
 
   return errors;

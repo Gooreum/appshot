@@ -46,6 +46,7 @@ export const LAYOUTS = {
     label: '기울인 디바이스 + 카피',
     desc: '디바이스를 -8도 기울이고 그림자를 깊게 준다. 역동적이고 프리미엄한 인상. 화면 내용은 상대적으로 덜 보인다.',
     template: 'layout-angled.html',
+    rotate: 8, // layout-angled.html의 rotate(-8deg)와 같아야 한다
     deviceHeight: 0.78,
     minWidth: 0.52,
     maxWidth: 0.78,
@@ -76,20 +77,33 @@ export const LAYOUTS = {
  *
  *   프레임 높이 = 폭 x (화면 세로비 + 위아래 베젤 비율)
  * 이므로 원하는 높이에서 폭을 거꾸로 구한 뒤 상·하한으로 자른다.
+ * 프레임 없이 화면 카드만 그릴 때(framed: false)는 베젤이 없다.
+ *
+ * 기울인 레이아웃은 회전 후 bounding box 높이(h·cos t + w·sin t)가 deviceHeight가
+ * 되도록 역산한다. 회전 전 높이로 맞추면 w·sin t만큼 튀어나와 카피를 덮는다 —
+ * 폭이 넓은 태블릿일수록 심해서 iPad 13"에서 100px 넘게 겹쳤다.
  */
-export function frameWidthFor(device, layout, canvas) {
+export function frameWidthFor(device, layout, canvas, { framed = true } = {}) {
   if (!layout.deviceHeight) return canvas.w;
 
-  const f = device.frame;
-  const screenRatio = device.screen.h / device.screen.w;
-  // 홈버튼 세대는 위아래 베젤(chin)이 좌우와 다르다
-  const vPad = f.chin ? f.chin.top + f.chin.bottom : f.bezel * 2;
-
-  const width = (canvas.h * layout.deviceHeight) / (screenRatio + vPad);
+  const width = (canvas.h * layout.deviceHeight) / heightPerWidth(device, layout, { framed });
 
   return Math.round(
     Math.min(Math.max(width, canvas.w * layout.minWidth), canvas.w * layout.maxWidth),
   );
+}
+
+/**
+ * 기기 폭 1px당 화면에 차지하는 높이 (회전 후 bounding box 기준).
+ * 템플릿은 이 값으로 "남은 공간에 들어가는 최대 폭"을 CSS에서 계산한다.
+ */
+export function heightPerWidth(device, layout, { framed = true } = {}) {
+  const f = device.frame;
+  const screenRatio = device.screen.h / device.screen.w;
+  // 홈버튼 세대는 위아래 베젤(chin)이 좌우와 다르다
+  const vPad = !framed ? 0 : f.chin ? f.chin.top + f.chin.bottom : f.bezel * 2;
+  const t = ((layout.rotate ?? 0) * Math.PI) / 180;
+  return (screenRatio + vPad) * Math.cos(t) + Math.sin(t);
 }
 
 export const LAYOUT_IDS = Object.keys(LAYOUTS);

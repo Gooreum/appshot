@@ -10,12 +10,20 @@
     padding-bottom: calc(var(--safe-bottom) * 1.4);
   }
 
+  /*
+   * 카피가 기기 아래에 있으므로 기기는 남은 공간(device-area) 안에 들어가야 한다.
+   * 카피 크기는 캔버스 폭에 비례해서, 폭이 넓은 태블릿일수록 남는 높이가 적다 —
+   * 고정 비율로만 크기를 정하면 iPad에서 기기가 카피를 덮었다.
+   * container-type으로 남은 높이를 재고, 넘칠 때만 폭을 줄인다 (4u는 translateY·그림자 몫).
+   */
   .stage--angled .device-area {
     align-items: center;
     overflow: visible;
+    container-type: size;
   }
 
   .stage--angled .device {
+    width: min(var(--device-w), calc((100cqh - var(--u) * 4) / var(--device-hpw)));
     transform: rotate(-8deg) translateY(calc(var(--u) * 2));
     transform-origin: center center;
   }

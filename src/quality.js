@@ -200,7 +200,7 @@ function checkSource(screen, cfg, device, layout, cwd, i, add) {
     }
 
     // 해상도: 프레임 렌더 폭보다 작으면 업스케일되어 뭉갠다
-    const frameW = frameWidthFor(device, layout, device.canvas);
+    const frameW = frameWidthFor(device, layout, device.canvas, { framed: cfg.theme.deviceFrame !== false });
     if (size.w < frameW) {
       add(i, 'source-lowres',
         `${src}의 폭이 ${size.w}px으로 렌더 폭 ${frameW}px보다 작습니다. 확대되어 흐려집니다.`);
