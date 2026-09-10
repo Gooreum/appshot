@@ -171,17 +171,60 @@ export function captureAndroid(dest, { serial } = {}) {
   }
 
   const args = serial ? ['-s', serial] : [];
-  const png = execFileSync(adb, [...args, 'exec-out', 'screencap', '-p'], {
-    maxBuffer: 64 * 1024 * 1024,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  const shell = (...cmd) => tryRun(adb, [...args, 'shell', ...cmd]);
+  const demo = (command, ...extra) =>
+    shell('am', 'broadcast', '-a', 'com.android.systemui.demo', '-e', 'command', command, ...extra);
+
+  // SystemUI demo mode로 상태바를 고정한다. 허용 설정은 원래 값을 기억했다가 되돌린다.
+  const allowed = readGlobalSetting(adb, args, 'sysui_demo_allowed');
+  if (allowed !== '1') shell('settings', 'put', 'global', 'sysui_demo_allowed', '1');
+  const entered = demo('enter');
+  const cleaned = entered && [
+    demo('clock', '-e', 'hhmm', '1200'),
+    demo('battery', '-e', 'level', '100', '-e', 'plugged', 'false'),
+    demo('network', '-e', 'wifi', 'show', '-e', 'level', '4'),
+    demo('network', '-e', 'mobile', 'show', '-e', 'datatype', 'none', '-e', 'level', '4'),
+    demo('notifications', '-e', 'visible', 'false'),
+  ].every(Boolean);
+  if (entered) sleepSync(DEMO_SETTLE_MS);
+
+  let png;
+  try {
+    png = execFileSync(adb, [...args, 'exec-out', 'screencap', '-p'], {
+      maxBuffer: 64 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } finally {
+    if (entered) demo('exit');
+    if (allowed !== '1') {
+      if (allowed === null || allowed === 'null') shell('settings', 'delete', 'global', 'sysui_demo_allowed');
+      else shell('settings', 'put', 'global', 'sysui_demo_allowed', allowed);
+    }
+  }
 
   if (!png?.length) {
     throw new Error('adb가 빈 이미지를 반환했습니다. 기기 화면이 꺼져 있는지 확인하세요.');
   }
 
   fs.writeFileSync(dest, png);
-  return { dest, device: serial ?? devices[0] };
+  return { dest, device: serial ?? devices[0], statusBar: cleaned && 'cleaned' };
+}
+
+/** demo mode broadcast는 비동기다 — SystemUI가 상태바를 다시 그릴 때까지 기다린다. */
+const DEMO_SETTLE_MS = 500;
+
+const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+/** adb shell settings get global <key>. 읽지 못하면 null. */
+function readGlobalSetting(adb, args, key) {
+  try {
+    return execFileSync(adb, [...args, 'shell', 'settings', 'get', 'global', key], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return null;
+  }
 }
 
 /**
