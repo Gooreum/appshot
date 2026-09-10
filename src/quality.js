@@ -27,18 +27,32 @@ const RATIO_TOLERANCE = 0.03;
 
 const CJK = /[ᄀ-ᇿ㄰-㆏가-힯぀-ヿ一-鿿]/;
 
+/** 스토어별 업로드 가능 최대 장수와, Play 추천 영역 노출에 필요한 최소 장수. */
+const MAX_SCREENS = { ios: 10, android: 8 };
+const PLAY_RECOMMEND_MIN = 4;
+
 export function checkAll(cfg, device, cwd = process.cwd()) {
   const warnings = [];
-  const add = (index, code, message) => warnings.push({ level: 'warn', screen: index + 1, code, message });
+  // index가 null이면 특정 장이 아니라 설정 전체에 대한 경고다
+  const add = (index, code, message) =>
+    warnings.push({ level: 'warn', screen: index === null ? null : index + 1, code, message });
+
+  const tabletText = cfg.platform === 'android' && device.formFactor === 'tablet';
 
   cfg.screens.forEach((screen, i) => {
     const layout = getLayout(screen.layout);
 
-    checkHeadline(screen, i, add);
+    // Play는 태블릿 스크린샷에서 추가 텍스트를 빼라고 권장한다 — 비어 있는 게 정상이다
+    if (!tabletText) checkHeadline(screen, i, add);
     checkSubhead(screen, cfg, device, i, add);
     checkContrast(screen, cfg, layout, i, add);
     checkSource(screen, cfg, device, layout, cwd, i, add);
+    checkRestricted(screen, cfg, i, add);
   });
+
+  checkCount(cfg, add);
+  checkDeviceImagery(cfg, add);
+  if (tabletText) checkTabletText(cfg, add);
 
   return warnings;
 }
@@ -81,6 +95,89 @@ function estimateLines(text, cfg, device) {
   const emPerChar = CJK.test(text) ? 1.0 : 0.55;
   const perLine = Math.max(1, Math.floor(available / (fontSize * emPerChar)));
   return Math.ceil(text.length / perLine);
+}
+
+// ── 스토어 정책 ─────────────────────────────────────────────────────────
+
+/*
+ * 스토어가 스크린샷에 쓰지 말라고 명시한 표현.
+ *   Google Play: "Best", "#1", "Top", "New", "Discount", "Sale", "Million Downloads",
+ *                "download now" / "install now" / "play now" / "try now"
+ *   App Store 2.3.7: 스크린샷에 가격을 넣지 말 것
+ * stores는 해당 분류를 명시한 스토어다. 오탐을 줄이려고 흔한 일반어("최고 기온",
+ * "수상한", "stress-free", "top of")는 걸리지 않게 좁혀 두었다.
+ */
+const RESTRICTED = [
+  {
+    kind: '순위·최상급',
+    stores: ['ios', 'android'],
+    re: /최고의|업계\s?최고|국내\s?최고|1위|넘버\s?원|베스트|수상작|수상\s?경력|어워드|no\.\s?1\b|#\s?1\b|\bbest\b|\bnumber\s+one\b|\baward|\btop[\s-]?(\d+|rated|ranked|charts?|apps?|pick)\b/i,
+  },
+  {
+    kind: '가격·할인',
+    stores: ['ios', 'android'],
+    re: /무료|공짜|할인|세일|특가|(?<![\w-])free\b(?!-)|\bsale\b|\bdiscount|\d+\s?%\s?(off|할인)|[$₩€£]\s?\d|\d[\d,]*\s?원(?![가-힣])/i,
+  },
+  {
+    kind: '다운로드·사용자 수',
+    stores: ['android'],
+    re: /\d+\s?(만|억)\s?(명|다운로드|사용자|유저)|다운로드\s?(수|돌파)|million\s+(downloads|users)/i,
+  },
+  { kind: '신규 표현', stores: ['android'], re: /\bnew\b|신규|신상/i },
+  {
+    kind: '설치 유도',
+    stores: ['android'],
+    re: /\b(download|install|play|try|get)\s+(it\s+)?now\b|지금\s?(다운|설치|받|플레이|체험)|(다운로드|다운|설치)\s?(하세요|받으세요|해\s?보세요)/i,
+  },
+];
+
+const POLICY_SOURCE = {
+  ios: 'App Store 심사에서 반려될 수 있습니다',
+  android: 'Google Play 스크린샷 정책상 쓰지 말아야 합니다',
+};
+
+function checkRestricted(screen, cfg, i, add) {
+  const store = cfg.platform === 'android' ? 'android' : 'ios';
+  for (const [key, label] of [['headline', '헤드라인'], ['subhead', '서브카피']]) {
+    const text = screen[key] ?? '';
+    for (const rule of RESTRICTED) {
+      if (!rule.stores.includes(store)) continue;
+      const m = text.match(rule.re);
+      if (!m) continue;
+      // 매칭이 어절 중간에서 끝나면("지금 다운"|로드하세요) 어절 끝까지 보여준다
+      const rest = text.slice(m.index + m[0].length).match(/^\S*/)[0];
+      add(i, `restricted-${rule.kind}`,
+        `${label}의 "${(m[0] + rest).trim()}" — ${rule.kind} 표현은 ${POLICY_SOURCE[store]}.`);
+    }
+  }
+}
+
+function checkCount(cfg, add) {
+  const store = cfg.platform === 'android' ? 'android' : 'ios';
+  const n = cfg.screens.length;
+  if (n > MAX_SCREENS[store]) {
+    add(null, 'count-max',
+      `스크린샷이 ${n}장입니다. ${store === 'android' ? 'Google Play' : 'App Store'}는 기기 유형당 최대 ${MAX_SCREENS[store]}장까지 올릴 수 있습니다.`);
+  }
+  if (store === 'android' && n < PLAY_RECOMMEND_MIN) {
+    add(null, 'count-recommend',
+      `스크린샷이 ${n}장입니다. Google Play 추천 영역에 노출되려면 ${PLAY_RECOMMEND_MIN}장 이상이 필요합니다.`);
+  }
+}
+
+function checkDeviceImagery(cfg, add) {
+  if (cfg.platform !== 'android' || cfg.theme.deviceFrame === false) return;
+  if (cfg.screens.every((s) => s.layout === 'fullbleed')) return; // 기기 요소가 없다
+  add(null, 'device-imagery',
+    'Google Play는 스크린샷에 기기 이미지를 피하라고 권장합니다 (금방 구식이 되고 일부 사용자를 소외시킨다는 이유). ' +
+      'theme.deviceFrame을 false로 두면 화면만 보여줍니다.');
+}
+
+function checkTabletText(cfg, add) {
+  if (!cfg.screens.some((s) => (s.headline ?? '').trim() || (s.subhead ?? '').trim())) return;
+  add(null, 'tablet-text',
+    'Google Play는 태블릿·크롬북 스크린샷에서 앱 화면이 아닌 텍스트를 빼라고 권장합니다 (홈 화면에서 잘릴 수 있음). ' +
+      'headline/subhead를 비우는 것을 고려하세요.');
 }
 
 // ── 대비 ────────────────────────────────────────────────────────────────
@@ -285,7 +382,7 @@ export function printWarnings(warnings) {
   if (!warnings.length) return;
   console.log(`\n  품질 점검 — ${warnings.length}건`);
   for (const w of warnings) {
-    console.log(`    [${w.screen}번] ${w.message}`);
+    console.log(`    [${w.screen === null ? '전체' : `${w.screen}번`}] ${w.message}`);
   }
   console.log('');
 }
