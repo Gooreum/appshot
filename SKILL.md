@@ -49,11 +49,17 @@ node ~/.claude/skills/appshot/bin/appshot.mjs devices --platform ios
 
 출력에서 `[필수]` 표시가 있는 슬롯을 우선 안내하고, AskUserQuestion으로 고르게 한다.
 
-- App Store는 **iPhone 6.9"(1290×2796)** 가 필수. iPad 앱이면 **iPad 13"(2064×2752)** 도 필수
-- Play Store는 **폰 스크린샷 최소 2장**이 필수
+- App Store는 **iPhone 6.9" 또는 6.5" 중 하나**가 필수 — 기본은 6.9"(1290×2796).
+  iPad에서 도는 앱이면 **iPad 13"(2064×2752)** 도 필수
+- Google Play는 기기 유형 합쳐 최소 2장이지만, **추천 영역에 노출되려면 4장 이상**이 필요하다.
+  그래서 Android `init`은 4장짜리 config를 만든다
 
-디바이스 선택이 바꾸는 것은 **목업의 생김새**(Dynamic Island / 펀치홀 / 홈버튼)이고,
+디바이스 선택이 바꾸는 것은 **목업의 생김새**(Dynamic Island / 노치 / 펀치홀 / 홈버튼)이고,
 출력 규격은 그 기기의 스토어 슬롯으로 고정된다. 이 구분을 사용자에게 알려준다.
+
+**Android는 기본으로 기기 프레임 없이 앱 화면만 둥근 카드로 보여준다** (`theme.deviceFrame: false`).
+Google Play가 "기기 이미지는 금방 구식이 되고 일부 사용자를 소외시킨다"며 피하라고 권장하기 때문이다.
+사용자가 원하면 `true`로 켤 수 있지만 경고가 뜬다는 것을 알려준다. App Store는 프레임이 허용되므로 iOS 기본은 `true`.
 
 ### 4단계 — 앱 화면 확보
 
@@ -66,6 +72,11 @@ node ~/.claude/skills/appshot/bin/appshot.mjs devices --platform ios
 node ~/.claude/skills/appshot/bin/appshot.mjs capture --platform ios
 ```
 adb가 없으면 실패가 아니라 "PNG를 직접 넣으세요" 안내가 나온다. 그때는 (a)로 유도한다.
+
+캡처할 때 상태바를 스토어 권장 상태로 정리한다 — iOS는 9:41·와이파이·셀룰러·배터리 가득,
+Android는 demo mode로 알림을 숨기고 아이콘을 가득 채운다. 끝나면 원래대로 되돌린다.
+시뮬레이터에 사용자가 걸어둔 상태바 설정이 있으면 건드리지 않는다.
+사용자가 직접 PNG를 줄 때는 상태바에 알림·낮은 배터리가 찍혀 있지 않은지 확인하라고 말한다.
 
 **아직 앱 화면이 없어도 진행할 수 있다.** `--placeholder`로 자리표시자를 써서
 카피와 레이아웃을 먼저 확정한 뒤 나중에 실제 화면으로 교체하는 편이 대개 빠르다.
@@ -95,6 +106,9 @@ node ~/.claude/skills/appshot/bin/appshot.mjs layouts
 - 기능이 아니라 **결과**를 쓴다 ("동기화 지원" ✗ → "어디서든 이어보기" ✓)
 - 한글 18자 / 영문 32자 이내 — 넘으면 스토어 목록 썸네일에서 잘린다
 - **첫 장이 가장 중요하다.** 대부분의 사용자는 첫 장만 본다
+- **스토어 금지 표현을 제안하지 않는다** — 가격·할인("무료"), 순위·최상급("최고의", "1위", "Best"),
+  그리고 Play에서는 "New"·"신규", "지금 다운로드" 같은 설치 유도, "100만 명" 같은 다운로드 수
+- Android는 카피가 이미지의 20%를 넘지 않게 짧게. Android 태블릿은 카피를 비우는 쪽을 권한다
 
 그다음 `appshot.config.json`의 `screens` 배열과 `theme`를 편집한다.
 배경이 여러 장에 걸쳐 이어지게 하려면 `theme.background.panorama: true`.
@@ -111,8 +125,21 @@ node ~/.claude/skills/appshot/bin/appshot.mjs render
 **결과물을 Read 도구로 직접 열어 눈으로 확인한다.** 규격이 맞는 것과
 보기 좋은 것은 다른 문제다. 큰 PNG는 `sips -Z 900`으로 축소본을 만들어 본다.
 
-렌더 시 품질 경고가 뜨면(대비 부족, 카피 길이, 소스 비율 불일치) 사용자에게 전달하고
-고칠지 묻는다. 경고는 렌더를 막지 않는다.
+렌더가 끝나면 품질 경고가 한 블록으로 출력된다. 사용자에게 전달하고 고칠지 묻는다.
+경고는 렌더를 막지 않는다.
+
+| 경고 | 근거 |
+|---|---|
+| 대비 부족, 헤드라인 길이, 서브카피 줄 수 | 가독성 (WCAG AA 큰 텍스트 3:1, 썸네일 잘림) |
+| 소스 비율·해상도 | 화면이 늘어나거나 흐려짐 |
+| 금지 표현 (`restricted-*`) | App Store 2.3.7 / Google Play 콘텐츠 가이드라인 |
+| 장수 부족·초과 (`count-*`) | Play 추천 노출 4장, 최대 iOS 10 / Android 8 |
+| 카피 면적 20% 초과 (`copy-area`) | Google Play — Android만 |
+| 기기 이미지 (`device-imagery`) | Google Play — Android에서 프레임을 켰을 때 |
+| 태블릿 텍스트 (`tablet-text`) | Google Play 대형 화면 — Android 태블릿 |
+
+깨진 소스 이미지(0바이트·잘린 파일·이미지가 아닌 파일)는 경고가 아니라 **에러로 중단**된다.
+`--placeholder`여도 자리표시자로 덮지 않는다.
 
 ## 커맨드 요약
 
@@ -127,7 +154,7 @@ render     스토어 스크린샷 생성                  [--only 1,3] [--previe
 
 ## 참고 문서
 
-- `references/store-specs.md` — 스토어별 필수 규격과 실제 리젝 사유
+- `references/store-specs.md` — 스토어 공식 규정 원문 요약(링크 포함), appshot이 자동 처리·경고·사람 확인할 것
 - `references/copywriting.md` — 헤드라인 작성 원칙
 
 ## 주의
