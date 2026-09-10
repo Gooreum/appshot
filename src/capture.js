@@ -74,6 +74,43 @@ export function connectedAndroidDevices(adb) {
 
 export class CaptureUnavailable extends Error {}
 
+/** 명령을 실행하고 성공 여부만 돌려준다. 상태바 정리처럼 실패해도 캡처는 계속해야 하는 보조 작업용. */
+function tryRun(bin, args) {
+  try {
+    execFileSync(bin, args, { stdio: ['ignore', 'ignore', 'ignore'] });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/*
+ * 스토어 권장 상태바 — Google Play는 "배터리·와이파이·셀룰러 표시가 가득 차 있고
+ * 알림이 없어야 한다"고 명시한다. iOS는 애플 마케팅 관례대로 9:41.
+ * 배터리는 discharging 100% — charged로 두면 초록 번개 아이콘이 붙는다.
+ */
+const IOS_STATUS_BAR = [
+  '--time', '9:41',
+  '--dataNetwork', 'wifi', '--wifiMode', 'active', '--wifiBars', '3',
+  '--cellularMode', 'active', '--cellularBars', '4',
+  '--batteryState', 'discharging', '--batteryLevel', '100',
+];
+
+/** 시뮬레이터에 이미 걸린 상태바 오버라이드가 있는지. 사용자가 직접 걸어둔 값은 덮거나 지우지 않는다. */
+function hasStatusBarOverride(target) {
+  try {
+    const out = execFileSync('xcrun', ['simctl', 'status_bar', target, 'list'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const lines = out.split('\n');
+    const sep = lines.findIndex((l) => /^=+$/.test(l.trim()));
+    return lines.slice(sep + 1).some((l) => l.trim());
+  } catch {
+    return false;
+  }
+}
+
 /** iOS 시뮬레이터 캡처. 부팅된 기기가 없으면 사용자가 고칠 수 있는 실패로 던진다. */
 export function captureIOS(dest, { udid } = {}) {
   if (process.platform !== 'darwin' || !which('xcrun')) {
@@ -93,6 +130,13 @@ export function captureIOS(dest, { udid } = {}) {
   }
 
   const target = udid ?? 'booted';
+
+  // 'kept' = 사용자 오버라이드를 그대로 씀, 'cleaned' = 정리 후 원래대로 되돌림, false = 정리 못 함
+  let statusBar = 'kept';
+  if (!hasStatusBarOverride(target)) {
+    statusBar = tryRun('xcrun', ['simctl', 'status_bar', target, 'override', ...IOS_STATUS_BAR]) && 'cleaned';
+  }
+
   try {
     execFileSync('xcrun', ['simctl', 'io', target, 'screenshot', dest], {
       stdio: ['ignore', 'ignore', 'pipe'],
@@ -100,9 +144,11 @@ export function captureIOS(dest, { udid } = {}) {
   } catch (err) {
     const detail = err.stderr?.toString().trim().split('\n').pop() ?? err.message;
     throw new Error(`시뮬레이터 캡처에 실패했습니다: ${detail}`);
+  } finally {
+    if (statusBar === 'cleaned') tryRun('xcrun', ['simctl', 'status_bar', target, 'clear']);
   }
 
-  return { dest, device: udid ?? booted[0]?.name ?? 'booted' };
+  return { dest, device: udid ?? booted[0]?.name ?? 'booted', statusBar };
 }
 
 /** Android 캡처. adb 자체가 없으면 CaptureUnavailable — 실패가 아니라 안내 대상이다. */

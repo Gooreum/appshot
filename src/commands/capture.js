@@ -26,13 +26,14 @@ export async function run({ opts }) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
 
   try {
-    const { device } = platform === 'ios'
+    const { device, statusBar } = platform === 'ios'
       ? captureIOS(dest, { udid: opts.udid })
       : captureAndroid(dest, { serial: opts.serial });
 
     const { size } = fs.statSync(dest);
     console.log(`\n  캡처 완료 — ${path.relative(cwd, dest)}  (${(size / 1024).toFixed(0)}KB)`);
-    console.log(`  기기: ${device}\n`);
+    console.log(`  기기: ${device}`);
+    console.log(`  상태바: ${STATUS_BAR_NOTE[String(statusBar)] ?? STATUS_BAR_NOTE.false}\n`);
     return 0;
   } catch (err) {
     // 도구 자체가 없는 것은 실패가 아니다 — PNG를 직접 넣으면 된다
@@ -44,6 +45,12 @@ export async function run({ opts }) {
     return 1;
   }
 }
+
+const STATUS_BAR_NOTE = {
+  cleaned: '시간·신호·배터리를 가득 찬 상태로 정리해 찍고 원래대로 복구했습니다',
+  kept: '시뮬레이터에 이미 걸린 상태바 설정을 그대로 사용했습니다',
+  false: '상태바를 정리하지 못했습니다 — 알림·배터리 표시가 스토어 권장과 맞는지 확인하세요',
+};
 
 function platformFromConfig(cwd) {
   const file = configPath(cwd);
