@@ -23,6 +23,7 @@ export const DEVICES = {
   'iphone-17-pro-max': {
     label: 'iPhone 17 Pro Max',
     platform: 'ios',
+    formFactor: 'phone',
     storeSlot: 'iPhone 6.9" 디스플레이',
     required: true, // App Store 제출 필수 슬롯
     canvas: { w: 1290, h: 2796 },
@@ -37,9 +38,12 @@ export const DEVICES = {
     },
   },
 
-  'iphone-16-plus': {
-    label: 'iPhone 16 Plus',
+  // 기기 이름은 App Store Connect 규격 문서의 슬롯별 기기 목록을 따른다.
+  // 6.5" 슬롯은 14 Plus·13 Pro Max 등 노치 세대이고, 16 Plus는 6.9" 슬롯이다.
+  'iphone-14-plus': {
+    label: 'iPhone 14 Plus',
     platform: 'ios',
+    formFactor: 'phone',
     storeSlot: 'iPhone 6.5" 디스플레이',
     required: false,
     canvas: { w: 1284, h: 2778 },
@@ -49,18 +53,20 @@ export const DEVICES = {
       radius: 0.112,
       innerRadius: 0.100,
       material: 'aluminum',
-      notch: { type: 'dynamic-island', w: 0.098, h: 0.029, top: 0.022 },
-      buttons: ['action-left', 'volume-left', 'power-right'],
+      notch: { type: 'notch', w: 0.36, h: 0.072 },
+      buttons: ['volume-left', 'power-right'],
     },
   },
 
-  'iphone-se-3': {
-    label: 'iPhone SE (3세대)',
+  // 5.5" 슬롯은 8 Plus 세대다 (SE 3세대는 4.7" 슬롯)
+  'iphone-8-plus': {
+    label: 'iPhone 8 Plus',
     platform: 'ios',
+    formFactor: 'phone',
     storeSlot: 'iPhone 5.5" 디스플레이',
     required: false,
     canvas: { w: 1242, h: 2208 },
-    screen: { w: 750, h: 1334 },
+    screen: { w: 1242, h: 2208 },
     frame: {
       bezel: 0.030,
       radius: 0.075,
@@ -76,6 +82,7 @@ export const DEVICES = {
   'ipad-pro-13': {
     label: 'iPad Pro 13"',
     platform: 'ios',
+    formFactor: 'tablet',
     storeSlot: 'iPad 13" 디스플레이',
     required: true, // iPad 앱이라면 필수 슬롯
     canvas: { w: 2064, h: 2752 },
@@ -93,6 +100,7 @@ export const DEVICES = {
   'ipad-air-11': {
     label: 'iPad Air 11"',
     platform: 'ios',
+    formFactor: 'tablet',
     storeSlot: 'iPad 11" 디스플레이',
     required: false,
     canvas: { w: 1668, h: 2388 },
@@ -111,6 +119,7 @@ export const DEVICES = {
   'pixel-9-pro-xl': {
     label: 'Pixel 9 Pro XL',
     platform: 'android',
+    formFactor: 'phone',
     storeSlot: '휴대전화 스크린샷',
     required: true, // Play Store는 폰 스크린샷 최소 2장 필수
     canvas: { w: 1080, h: 1920 },
@@ -128,6 +137,7 @@ export const DEVICES = {
   'pixel-9': {
     label: 'Pixel 9',
     platform: 'android',
+    formFactor: 'phone',
     storeSlot: '휴대전화 스크린샷',
     required: false,
     canvas: { w: 1080, h: 1920 },
@@ -145,6 +155,7 @@ export const DEVICES = {
   'galaxy-s25-ultra': {
     label: 'Galaxy S25 Ultra',
     platform: 'android',
+    formFactor: 'phone',
     storeSlot: '휴대전화 스크린샷',
     required: false,
     canvas: { w: 1080, h: 1920 },
@@ -163,9 +174,10 @@ export const DEVICES = {
   'galaxy-tab-s10': {
     label: 'Galaxy Tab S10',
     platform: 'android',
+    formFactor: 'tablet',
     storeSlot: '10인치 태블릿 스크린샷',
     required: false,
-    canvas: { w: 1200, h: 1920 },
+    canvas: { w: 1440, h: 2560 }, // Play 대형 화면 가이드: 세로는 9:16, 1080~7680px
     screen: { w: 1848, h: 2960 },
     frame: {
       bezel: 0.033,

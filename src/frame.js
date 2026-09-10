@@ -109,6 +109,23 @@ function notchCSS(notch, W) {
 }`;
   }
 
+  // 노치 세대 — 화면 상단에 붙어 있고 아래 모서리만 둥글다
+  if (notch.type === 'notch') {
+    const h = W * notch.h;
+    return `
+.notch {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+  width: ${px(W * notch.w)};
+  height: ${px(h)};
+  border-radius: 0 0 ${px(h * 0.45)} ${px(h * 0.45)};
+  background: #000;
+  z-index: 3;
+}`;
+  }
+
   if (notch.type === 'punch-hole') {
     const d = W * notch.d;
     return `
