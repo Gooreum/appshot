@@ -48,14 +48,31 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
 
   // 이미지는 브라우저를 띄우기 전에 전부 읽는다 —
   // 파일이 없으면 브라우저를 켜기 전에 실패하는 편이 빠르고 깔끔하다.
+  // 문제 파일은 첫 번째에서 멈추지 않고 전부 모은다 — 하나 고치고 다시 돌려야 다음 게 보이면 번거롭다.
+  // 같은 파일을 여러 장이 쓰면 한 번만, 쓰는 장 번호를 함께 보여준다.
+  const problems = new Map(); // 절대경로 → { error, screens }
+  const load = (source, index) => {
+    try {
+      return readImage(source, cwd, device, placeholder, index + 1);
+    } catch (err) {
+      if (!(err instanceof ScreenImageError)) throw err;
+      const key = path.resolve(cwd, source);
+      const p = problems.get(key) ?? { error: err, screens: [] };
+      if (!p.screens.includes(index + 1)) p.screens.push(index + 1);
+      problems.set(key, p);
+      return null;
+    }
+  };
   const loaded = targets.map(({ screen, index }) => ({
     screen,
     index,
     images: {
-      main: readImage(screen.source, cwd, device, placeholder, index + 1),
-      second: screen.source2 ? readImage(screen.source2, cwd, device, placeholder, index + 1) : null,
+      main: load(screen.source, index),
+      second: screen.source2 ? load(screen.source2, index) : null,
     },
   }));
+  if (problems.size === 1) throw [...problems.values()][0].error; // 1개면 원래 문구 그대로
+  if (problems.size > 1) throw new Error(imageProblemsMessage([...problems.values()]));
 
   const outDir = path.resolve(cwd, cfg.output, cfg.locale, cfg.device);
   fs.mkdirSync(outDir, { recursive: true });
@@ -128,6 +145,26 @@ function copyAreaRatio(page) {
   });
 }
 
+/** 앱 화면 파일 문제. 여러 개를 모아 한 번에 보여주려고 파일·사유를 따로 싣는다. */
+class ScreenImageError extends Error {
+  constructor(message, { source, reason, kind }) {
+    super(message);
+    Object.assign(this, { source, reason, kind }); // kind: 'missing' | 'format' | 'broken'
+  }
+}
+
+/** 문제 파일이 여러 개일 때의 메시지 — 파일마다 한 줄, 쓰는 장 번호와 사유. */
+function imageProblemsMessage(problems) {
+  const lines = problems.map(({ error, screens }) => `  ${error.source} (${screens.join('·')}번) — ${error.reason}`);
+  const hint = problems.some((p) => p.error.kind === 'missing')
+    ? "\n  없는 화면은 'appshot capture'로 캡처하거나 --placeholder로 자리표시자를 쓰세요."
+    : '';
+  return (
+    `앱 화면 ${problems.length}개에 문제가 있습니다:\n${lines.join('\n')}\n` +
+    `  깨진 파일은 다시 만들거나 다른 화면을 지정하세요.${hint}`
+  );
+}
+
 /** 이미지 파일을 data URI로 읽는다. setContent에는 baseURL이 없어 상대 경로가 통하지 않는다. */
 function readImage(source, cwd, device, placeholder, screenNo) {
   if (!source) return null;
@@ -135,17 +172,22 @@ function readImage(source, cwd, device, placeholder, screenNo) {
 
   if (!fs.existsSync(file)) {
     if (placeholder) return placeholderImage(device, screenNo);
-    throw new Error(
+    throw new ScreenImageError(
       `앱 화면을 찾을 수 없습니다: ${source}\n` +
         `  찾은 경로: ${file}\n` +
         `  PNG를 넣거나, 'appshot capture'로 캡처하거나, --placeholder로 자리표시자를 쓰세요.`,
+      { source, reason: '파일을 찾을 수 없습니다.', kind: 'missing' },
     );
   }
 
   const ext = path.extname(file).toLowerCase();
   const mime = MIME[ext];
   if (!mime) {
-    throw new Error(`지원하지 않는 이미지 형식입니다: ${source} (png/jpg/webp만 가능)`);
+    throw new ScreenImageError(`지원하지 않는 이미지 형식입니다: ${source} (png/jpg/webp만 가능)`, {
+      source,
+      reason: '지원하지 않는 확장자입니다 (png/jpg/webp만 가능).',
+      kind: 'format',
+    });
   }
 
   // 확장자만 믿지 않는다. 깨진 파일은 --placeholder여도 자리표시자로 덮지 않는다 —
@@ -154,10 +196,11 @@ function readImage(source, cwd, device, placeholder, screenNo) {
   try {
     validateImage(buf);
   } catch (err) {
-    throw new Error(
+    throw new ScreenImageError(
       `앱 화면을 읽을 수 없습니다: ${source}\n` +
         `  ${err.message}\n` +
         `  파일을 다시 만들거나 다른 화면을 지정하세요.`,
+      { source, reason: err.message, kind: 'broken' },
     );
   }
 
