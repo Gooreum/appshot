@@ -60,6 +60,8 @@ export function buildHTML({ cfg, screen, device, index = 0, total = 1, images = 
 :root {
   --canvas-w: ${canvas.w}px;
   --canvas-h: ${canvas.h}px;
+  /* base.css의 --u가 쓰는 기준. 짧은 변의 1% — 가로 규격에서 폭을 쓰면 글자가 커진다 */
+  --unit: ${Math.min(canvas.w, canvas.h) / 100}px;
   --font-stack: ${cfg.theme.fontStack};
   --headline-color: ${cfg.theme.headline.color};
   --headline-weight: ${cfg.theme.headline.weight ?? 800};

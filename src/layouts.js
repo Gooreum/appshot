@@ -1,3 +1,5 @@
+import { isLandscape } from './devices.js';
+
 /**
  * 레이아웃 카탈로그.
  *
@@ -22,6 +24,12 @@
  *                1을 넘으면 화면 밖으로 흘러넘쳐 잘린다.
  * minWidth/maxWidth — 그렇게 역산한 폭의 하한·상한(캔버스 폭 대비).
  *                     좌우 여백이 사라지거나 반대로 너무 작아지는 것을 막는다.
+ *
+ * landscape — 가로 규격(Mac 2880×1800)에서 위 셋을 갈아 끼우는 값.
+ *             세로 값을 그대로 쓰면 폭이 상한에 걸려 카피 자리가 사라진다:
+ *             caption-top의 0.95면 1800×0.95÷0.625 = 2736px으로 캔버스 폭(2880)에
+ *             거의 닿는다. 레이아웃을 두 벌로 나누지 않는 이유는 템플릿과 설명이
+ *             같고 치수만 다르기 때문이다.
  */
 export const LAYOUTS = {
   'caption-top': {
@@ -31,6 +39,7 @@ export const LAYOUTS = {
     deviceHeight: 0.95,
     minWidth: 0.60,
     maxWidth: 0.88,
+    landscape: { deviceHeight: 0.58, minWidth: 0.50, maxWidth: 0.84 },
     screens: 1,
   },
   'caption-bottom': {
@@ -40,6 +49,7 @@ export const LAYOUTS = {
     deviceHeight: 0.80,
     minWidth: 0.55,
     maxWidth: 0.86,
+    landscape: { deviceHeight: 0.60, minWidth: 0.50, maxWidth: 0.84 },
     screens: 1,
   },
   angled: {
@@ -50,6 +60,8 @@ export const LAYOUTS = {
     deviceHeight: 0.78,
     minWidth: 0.52,
     maxWidth: 0.78,
+    // rotate는 오버라이드하지 않는다 — 템플릿의 rotate(-8deg)와 짝이어야 한다
+    landscape: { deviceHeight: 0.54, minWidth: 0.42, maxWidth: 0.72 },
     screens: 1,
   },
   fullbleed: {
@@ -68,6 +80,7 @@ export const LAYOUTS = {
     deviceHeight: 0.84,
     minWidth: 0.38,
     maxWidth: 0.58,
+    landscape: { deviceHeight: 0.42, minWidth: 0.30, maxWidth: 0.52 },
     screens: 2,
   },
 };
@@ -83,14 +96,23 @@ export const LAYOUTS = {
  * 되도록 역산한다. 회전 전 높이로 맞추면 w·sin t만큼 튀어나와 카피를 덮는다 —
  * 폭이 넓은 태블릿일수록 심해서 iPad 13"에서 100px 넘게 겹쳤다.
  */
+/**
+ * 이 기기에 적용할 레이아웃 치수.
+ *
+ * 가로 규격이면 `landscape` 블록을 얹는다. 세로 기기는 손대지 않은 원본을 그대로 받는다 —
+ * 이 함수가 세로에서 아무것도 하지 않는다는 것이 가로 지원의 안전성 근거다.
+ */
+export function metricsFor(device, layout) {
+  return isLandscape(device) && layout.landscape ? { ...layout, ...layout.landscape } : layout;
+}
+
 export function frameWidthFor(device, layout, canvas, { framed = true } = {}) {
-  if (!layout.deviceHeight) return canvas.w;
+  const m = metricsFor(device, layout);
+  if (!m.deviceHeight) return canvas.w;
 
-  const width = (canvas.h * layout.deviceHeight) / heightPerWidth(device, layout, { framed });
+  const width = (canvas.h * m.deviceHeight) / heightPerWidth(device, layout, { framed });
 
-  return Math.round(
-    Math.min(Math.max(width, canvas.w * layout.minWidth), canvas.w * layout.maxWidth),
-  );
+  return Math.round(Math.min(Math.max(width, canvas.w * m.minWidth), canvas.w * m.maxWidth));
 }
 
 /**

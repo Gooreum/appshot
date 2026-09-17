@@ -92,9 +92,11 @@ function checkSubhead(screen, cfg, device, i, add) {
  * 목적이므로 글자 폭 근사로 충분하다. CJK는 약 1em, 라틴은 약 0.55em.
  */
 function estimateLines(text, cfg, device) {
-  const canvasW = device.canvas.w;
-  const available = canvasW * (1 - 0.08 * 2); // base.css의 좌우 안전 여백 8%
-  const fontSize = canvasW * (cfg.theme.subhead.size ?? 0.029);
+  // base.css의 --u와 같은 기준(짧은 변의 1%)이어야 추정이 맞는다.
+  // 세로 기기는 짧은 변이 곧 폭이라 예전 식과 값이 같다.
+  const unit = Math.min(device.canvas.w, device.canvas.h);
+  const available = device.canvas.w - unit * 0.08 * 2; // base.css의 --safe-x = 8u, 좌우 2번
+  const fontSize = unit * (cfg.theme.subhead.size ?? 0.029);
   const emPerChar = CJK.test(text) ? 1.0 : 0.55;
   const perLine = Math.max(1, Math.floor(available / (fontSize * emPerChar)));
   return Math.ceil(text.length / perLine);
