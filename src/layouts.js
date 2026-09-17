@@ -39,7 +39,9 @@ export const LAYOUTS = {
     deviceHeight: 0.95,
     minWidth: 0.60,
     maxWidth: 0.88,
-    landscape: { deviceHeight: 0.58, minWidth: 0.50, maxWidth: 0.84 },
+    // 가로 화면에는 글자가 빽빽한 데스크톱 UI가 들어간다. 세로 폰보다 크게 잡아야
+    // 스토어 목록에서 화면 내용이 읽힌다. 0.58에서 실물로 보고 올렸다.
+    landscape: { deviceHeight: 0.64, minWidth: 0.50, maxWidth: 0.86 },
     screens: 1,
   },
   'caption-bottom': {
@@ -49,7 +51,7 @@ export const LAYOUTS = {
     deviceHeight: 0.80,
     minWidth: 0.55,
     maxWidth: 0.86,
-    landscape: { deviceHeight: 0.60, minWidth: 0.50, maxWidth: 0.84 },
+    landscape: { deviceHeight: 0.66, minWidth: 0.50, maxWidth: 0.86 },
     screens: 1,
   },
   angled: {
@@ -60,8 +62,12 @@ export const LAYOUTS = {
     deviceHeight: 0.78,
     minWidth: 0.52,
     maxWidth: 0.78,
-    // rotate는 오버라이드하지 않는다 — 템플릿의 rotate(-8deg)와 짝이어야 한다
-    landscape: { deviceHeight: 0.54, minWidth: 0.42, maxWidth: 0.72 },
+    // rotate는 오버라이드하지 않는다 — 템플릿의 rotate(-8deg)와 짝이어야 한다.
+    //
+    // 가로에서 이 레이아웃은 **글자가 빽빽한 화면에 쓰지 않는 편이 낫다.** 회전 때문에
+    // 같은 deviceHeight라도 실제 창이 작아지고, 데스크톱 UI의 본문이 뭉개진다.
+    // 실물로 확인했다: 삭제 확인 시트를 angled로 넣었더니 시트 글씨를 읽을 수 없었다.
+    landscape: { deviceHeight: 0.58, minWidth: 0.42, maxWidth: 0.74 },
     screens: 1,
   },
   fullbleed: {

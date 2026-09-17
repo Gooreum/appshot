@@ -9,7 +9,17 @@ export const CONFIG_NAME = 'appshot.config.json';
 const FONT_STACK =
   "-apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo', 'Segoe UI', Roboto, sans-serif";
 
-export function defaultConfig({ platform = 'ios', device = 'iphone-17-pro-max' } = {}) {
+/**
+ * 플랫폼(과 선택적으로 기기)에 맞는 기본 config.
+ *
+ * 기기 기본값을 'iphone-17-pro-max'로 **고정하지 않는다.** 그러면
+ * `defaultConfig({ platform: 'android' })`가 android + iPhone이라는 짝이 안 맞는
+ * config를 만들고, validateConfig가 바로 걸러 내는 값이 된다.
+ * 지금까지는 호출자(scaffold)가 먼저 resolvePair를 거쳐서 드러나지 않았을 뿐이다.
+ * macOS를 더하면서 e2e가 이걸 잡았다.
+ */
+export function defaultConfig(opts = {}) {
+  const { platform, device } = resolvePair(opts);
   return {
     platform,
     device,
