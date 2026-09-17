@@ -19,6 +19,22 @@ export async function run({ opts }) {
     return 1;
   }
 
+  // macOS는 자동 캡처를 하지 않는다.
+  // 시뮬레이터와 달리 "어느 창을 찍을지"는 사람만 아는 것이고,
+  // 화면을 통째로 찍으면 열려 있던 다른 창의 내용이 스토어에 그대로 올라간다.
+  // screens/를 만들기 전에 빠져나가야 빈 폴더가 남지 않는다.
+  if (platform === 'macos') {
+    console.log(`
+  macOS는 자동 캡처를 지원하지 않습니다. 앱 창만 찍어 screens/에 넣으세요:
+
+    screencapture -o -l <창 ID> screens/01.png
+
+  -o는 창 그림자를 뺍니다 (appshot이 CSS로 그림자를 따로 줍니다).
+  ⚠️ 화면 전체를 찍지 마세요 — 다른 창의 내용이 스토어에 그대로 올라갑니다.
+`);
+    return 0;
+  }
+
   const dir = path.join(cwd, 'screens');
   const dest = opts.name
     ? path.join(dir, opts.name.endsWith('.png') ? opts.name : `${opts.name}.png`)

@@ -37,9 +37,13 @@ cd ~/.claude/skills/appshot && npx playwright install chromium
 
 ### 2단계 — 플랫폼 선택
 
-AskUserQuestion으로 묻는다: **Apple (App Store)** / **Android (Google Play)** / 둘 다.
+AskUserQuestion으로 묻는다: **Apple (App Store)** / **Mac (Mac App Store)** /
+**Android (Google Play)** / 여럿.
 
-둘 다면 플랫폼별로 config를 나눠 두 번 렌더한다 (규격이 다르므로).
+여럿이면 플랫폼별로 config를 나눠 여러 번 렌더한다 (규격이 다르므로).
+
+**"맥 앱", "맥북 앱"은 `macos`다** — `ios`가 아니다. Mac App Store는 기기 슬롯이 없고
+16:10 **가로** 규격(2880×1800)이라 레이아웃 치수가 세로 기기와 따로 잡혀 있다.
 
 ### 3단계 — 디바이스 선택
 
@@ -61,6 +65,10 @@ node ~/.claude/skills/appshot/bin/appshot.mjs devices --platform ios
 Google Play가 "기기 이미지는 금방 구식이 되고 일부 사용자를 소외시킨다"며 피하라고 권장하기 때문이다.
 사용자가 원하면 `true`로 켤 수 있지만 경고가 뜬다는 것을 알려준다. App Store는 프레임이 허용되므로 iOS 기본은 `true`.
 
+**macOS도 기본은 프레임 없음이다** (`theme.deviceFrame: false`). Mac 스크린샷에 넣는 것은
+바탕화면이 아니라 앱 **창**이고, 창을 노트북 베젤 안에 넣으면 바탕화면이 없어 어색해진다.
+MacBook 목업은 Mac App Store에서 **필수가 아니다** — 앱 창만 올리는 Mac 앱이 많다.
+
 ### 4단계 — 앱 화면 확보
 
 두 가지 방법이 있다. 사용자에게 어느 쪽인지 묻는다.
@@ -72,6 +80,12 @@ Google Play가 "기기 이미지는 금방 구식이 되고 일부 사용자를 
 node ~/.claude/skills/appshot/bin/appshot.mjs capture --platform ios
 ```
 adb가 없으면 실패가 아니라 "PNG를 직접 넣으세요" 안내가 나온다. 그때는 (a)로 유도한다.
+
+**macOS는 자동 캡처가 없다.** 어느 창을 찍을지는 사람만 안다:
+```bash
+screencapture -o -l <창 ID> screens/01.png    # -o = 창 그림자 제외
+```
+⚠️ **화면 전체를 찍지 않는다.** 열려 있던 다른 창의 내용이 그대로 스토어에 올라간다.
 
 캡처할 때 상태바를 스토어 권장 상태로 정리한다 — iOS는 9:41·와이파이·셀룰러·배터리 가득,
 Android는 demo mode로 알림을 숨기고 아이콘을 가득 채운다. 끝나면 원래대로 되돌린다.

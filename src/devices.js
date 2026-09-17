@@ -15,6 +15,7 @@
 
 export const PLATFORMS = {
   ios: { label: 'Apple', store: 'App Store' },
+  macos: { label: 'Mac', store: 'Mac App Store' },
   android: { label: 'Android', store: 'Google Play' },
 };
 
@@ -115,6 +116,35 @@ export const DEVICES = {
     },
   },
 
+  // ─── macOS ──────────────────────────────────────────────────────────────
+  // Mac App Store는 기기 슬롯이 아니라 **해상도**로 받는다
+  // (1280×800 · 1440×900 · 2560×1600 · 2880×1800 — 전부 16:10).
+  // 가장 큰 것만 올리면 나머지는 애플이 축소해서 쓰므로 기기 하나로 충분하다.
+  //
+  // 이 기기는 이 카탈로그에서 **유일한 가로 규격**이다. layouts.js가 isLandscape로
+  // 갈라져 다른 치수를 쓴다 — 세로 값을 그대로 쓰면 폭이 상한에 걸려 카피 자리가 사라진다.
+  //
+  // frame을 채워 두긴 하지만 기본값은 프레임 없음이다(config.js의 deviceFrame).
+  // Mac 스크린샷에 넣는 것은 바탕화면이 아니라 앱 **창**이고,
+  // 창을 노트북 베젤 안에 넣으면 바탕화면이 없어 어색해진다.
+  'mac-16-10': {
+    label: 'Mac 16:10',
+    platform: 'macos',
+    formFactor: 'desktop',
+    storeSlot: 'Mac 디스플레이 (2880×1800)',
+    required: true, // Mac 앱이면 이 규격 하나는 반드시 올려야 한다
+    canvas: { w: 2880, h: 1800 },
+    screen: { w: 2880, h: 1800 },
+    frame: {
+      bezel: 0.011,
+      radius: 0.016,
+      innerRadius: 0.008,
+      material: 'aluminum',
+      notch: { type: 'none' },
+      buttons: [],
+    },
+  },
+
   // ─── Android ────────────────────────────────────────────────────────────
   'pixel-9-pro-xl': {
     label: 'Pixel 9 Pro XL',
@@ -210,6 +240,14 @@ export function getDevice(id) {
 
 /** 캔버스 규격을 사람이 읽는 문자열로. */
 export const canvasLabel = (d) => `${d.canvas.w}×${d.canvas.h}`;
+
+/**
+ * 가로 규격인가.
+ *
+ * 새 필드를 두지 않고 캔버스에서 유도한다 — 기기를 추가할 때 손댈 곳이 하나 줄고,
+ * 선언한 방향과 실제 캔버스가 어긋날 일이 없다. 폰·태블릿 9종은 전부 w < h다.
+ */
+export const isLandscape = (d) => d.canvas.w > d.canvas.h;
 
 /** 세로/가로 비율 (h/w). 소스 이미지 비율 검증에 쓴다. */
 export const screenRatio = (d) => d.screen.h / d.screen.w;

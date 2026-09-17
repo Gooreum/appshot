@@ -3,10 +3,10 @@ import { parseArgs } from '../src/args.js';
 
 const COMMANDS = {
   doctor:  { desc: '실행 환경 점검 (playwright / chromium / simctl / adb)', usage: 'appshot doctor' },
-  init:    { desc: 'appshot.config.json + screens/ 스캐폴딩',              usage: 'appshot init [--platform ios|android] [--device <id>]' },
-  devices: { desc: '지원 디바이스와 스토어 제출 규격 목록',                  usage: 'appshot devices [--platform ios|android] [--json]' },
+  init:    { desc: 'appshot.config.json + screens/ 스캐폴딩',              usage: 'appshot init [--platform ios|macos|android] [--device <id>]' },
+  devices: { desc: '지원 디바이스와 스토어 제출 규격 목록',                  usage: 'appshot devices [--platform ios|macos|android] [--json]' },
   layouts: { desc: '레이아웃 5종 설명',                                     usage: 'appshot layouts [--json]' },
-  capture: { desc: '시뮬레이터/기기에서 앱 화면 캡처 → screens/',            usage: 'appshot capture --platform ios|android [--name <파일명>]' },
+  capture: { desc: '시뮬레이터/기기에서 앱 화면 캡처 → screens/ (macOS 제외)', usage: 'appshot capture --platform ios|android [--name <파일명>]' },
   render:  { desc: 'config를 읽어 스토어 스크린샷 생성',                     usage: 'appshot render [--only 1,3] [--preview] [--placeholder]' },
 };
 
