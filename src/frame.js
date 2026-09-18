@@ -217,7 +217,13 @@ function shadowCSS(W) {
     0 ${px(W * 0.160)} ${px(W * 0.300)} rgba(0,0,0,.20);`;
 }
 
-/** 프레임 없는 카드의 모서리 반경 (카드 폭 대비). 기기 화면 곡률보다 작게 둬서 폰처럼 보이지 않게 한다. */
+/**
+ * 프레임 없는 카드의 **기본** 모서리 반경 (카드 폭 대비).
+ *
+ * 폰 카드 기준이다 — 기기 화면 곡률보다 작게 둬서 폰처럼 보이지 않게 한다.
+ * 데스크톱 창처럼 다른 값이 맞는 기기는 `frame.plainRadius`로 따로 준다.
+ * (맥에 이 값을 그대로 쓰면 1843px 렌더에서 92px이 되어 실제 창보다 5배 둥글었다.)
+ */
 const PLAIN_RADIUS = 0.05;
 
 /**
@@ -226,9 +232,13 @@ const PLAIN_RADIUS = 0.05;
  * Google Play는 폰 스크린샷에 기기 이미지를 피하라고 권장한다
  * ("can become obsolete quickly or alienate some users").
  * 클래스명을 .device로 유지해서 레이아웃 템플릿의 회전·겹침 규칙을 그대로 쓴다.
+ *
+ * **반경을 0에 가깝게 두지 않는다.** 창 캡처(`screencapture -o`)는 모서리가 이미 둥글고
+ * 그 바깥이 투명인데 `.screen-clip` 배경이 검정이라, CSS 반경이 소스 자체 반경보다
+ * 작으면 모서리에 검은 삼각형이 드러난다.
  */
-export function plainCSS(W) {
-  const radius = px(W * PLAIN_RADIUS);
+export function plainCSS(device, W) {
+  const radius = px(W * (device.frame.plainRadius ?? PLAIN_RADIUS));
   return `
 .device {
   position: relative;

@@ -94,7 +94,7 @@ export function buildHTML({ cfg, screen, device, index = 0, total = 1, images = 
 }
 ${baseCSS()}
 ${backgroundCSS(cfg.theme.background, index, total)}
-${usesDevice ? (windowed ? windowCSS(frameW) : framed ? frameCSS(device, frameW) : plainCSS(frameW)) : ''}
+${usesDevice ? (windowed ? windowCSS(frameW) : framed ? frameCSS(device, frameW) : plainCSS(device, frameW)) : ''}
 </style>
 </head>
 <body>

@@ -141,6 +141,11 @@ export const DEVICES = {
       bezel: 0.011,
       radius: 0.016,
       innerRadius: 0.008,
+      // 프레임 없이(deviceFrame:false) 창만 얹을 때의 모서리.
+      // 기본값 0.05는 폰 카드용이라 1843px 렌더에서 92px이 되어
+      // 실제 macOS 창(이 배율에서 약 17px)보다 5배 둥글었다.
+      // 소스 캡처의 모서리 바깥이 투명이므로 그보다는 커야 검은 모서리가 안 보인다.
+      plainRadius: 0.011,
       material: 'aluminum',
       notch: { type: 'none' },
       buttons: [],
