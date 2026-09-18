@@ -143,6 +143,28 @@ node ~/.claude/skills/appshot/bin/appshot.mjs layouts
 그다음 `appshot.config.json`의 `screens` 배열과 `theme`를 편집한다.
 배경이 여러 장에 걸쳐 이어지게 하려면 `theme.background.panorama: true`.
 
+### 배경
+
+기본은 그라디언트다. 사용자가 배경 이미지를 갖고 있으면 이렇게 깐다:
+
+```json
+"background": {
+  "type": "image",
+  "source": "backgrounds/bg.png",
+  "fit": "cover",
+  "overlay": 0.28,
+  "panorama": false
+}
+```
+
+- 경로는 **대상 프로젝트 기준**이다. 깨진·없는 배경 파일은 앱 화면과 똑같이 렌더 전에 거부된다
+- `overlay`는 배경 위 가독성 마스크로 **기본 0.28**이다. 배경 사진은 부분마다 밝기가 달라 대비를
+  자동 검사할 수 없어서 기본으로 씌운다. 이미 어두운 배경이면 `0`으로 끄라고 안내한다
+- `fit: cover`는 가장자리를 자르고, `contain`은 다 보이는 대신 여백이 남는다.
+  비율이 캔버스와 20% 넘게 다르면 `bg-crop` 경고가 뜬다
+- **appshot은 배경 이미지를 만들어 주지 않는다.** 사용자가 파일을 주지 않으면 그라디언트를 쓰거나,
+  이미지를 따로 만들어 `backgrounds/`에 넣도록 안내한다
+
 ### 6단계 — 렌더
 
 ```bash
