@@ -138,6 +138,18 @@ export function validateConfig(cfg) {
     push('theme이 없습니다.');
   } else {
     if (!t.background || typeof t.background !== 'object') push('theme.background가 없습니다.');
+    else if (t.background.type === 'image') {
+      if (typeof t.background.source !== 'string' || !t.background.source.trim()) {
+        push('theme.background.type이 image면 source(배경 이미지 경로)가 필요합니다.');
+      }
+      if (t.background.fit !== undefined && !['cover', 'contain'].includes(t.background.fit)) {
+        push("theme.background.fit은 'cover' 또는 'contain'이어야 합니다.");
+      }
+      const o = t.background.overlay;
+      if (o !== undefined && (typeof o !== 'number' || Number.isNaN(o) || o < 0 || o > 1)) {
+        push('theme.background.overlay는 0~1 사이 숫자여야 합니다.');
+      }
+    }
     if (!t.headline || typeof t.headline !== 'object') push('theme.headline이 없습니다.');
     if (!t.subhead || typeof t.subhead !== 'object') push('theme.subhead가 없습니다.');
     if (t.deviceFrame !== undefined && typeof t.deviceFrame !== 'boolean') {

@@ -53,12 +53,15 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
   const problems = new Map(); // 절대경로 → { error, screens }
   const load = (source, index) => {
     try {
-      return readImage(source, cwd, device, placeholder, index + 1);
+      // index가 null이면 배경 이미지 — 메시지 문구도 '배경 이미지'로 바꾼다
+      return readImage(source, cwd, device, placeholder, (index ?? 0) + 1, index === null ? '배경 이미지' : '앱 화면');
     } catch (err) {
       if (!(err instanceof ScreenImageError)) throw err;
       const key = path.resolve(cwd, source);
       const p = problems.get(key) ?? { error: err, screens: [] };
-      if (!p.screens.includes(index + 1)) p.screens.push(index + 1);
+      // 배경 이미지는 특정 장이 아니라 전체에 쓰이므로 번호 대신 '배경'으로 표시한다
+      const label = index === null ? '배경' : index + 1;
+      if (!p.screens.includes(label)) p.screens.push(label);
       problems.set(key, p);
       return null;
     }
@@ -71,6 +74,25 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
       second: screen.source2 ? load(screen.source2, index) : null,
     },
   }));
+  // 배경 이미지는 장마다 같으므로 한 번만 읽는다.
+  // --placeholder는 "에셋이 아직 없다"는 뜻이라 배경이 없으면 그라디언트로 떨어지고 경고만 남긴다.
+  // 깨진 배경 파일은 placeholder여도 problems로 간다 — 앱 화면과 같은 원칙이다.
+  let background = null;
+  const bgCfg = cfg.theme.background;
+  if (bgCfg?.type === 'image') {
+    const bgFile = path.resolve(cwd, bgCfg.source ?? '');
+    if (placeholder && !fs.existsSync(bgFile)) {
+      warnings.push({
+        level: 'warn',
+        screen: null,
+        code: 'bg-missing',
+        message: `배경 이미지가 없어 기본 그라디언트로 렌더했습니다: ${bgCfg.source}`,
+      });
+    } else {
+      background = load(bgCfg.source, null);
+    }
+  }
+
   if (problems.size === 1) throw [...problems.values()][0].error; // 1개면 원래 문구 그대로
   if (problems.size > 1) throw new Error(imageProblemsMessage([...problems.values()]));
 
@@ -95,7 +117,7 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
         device,
         index,
         total: cfg.screens.length,
-        images,
+        images: { ...images, background },
       });
 
       await page.setContent(html, { waitUntil: 'load' });
@@ -153,9 +175,26 @@ class ScreenImageError extends Error {
   }
 }
 
-/** 문제 파일이 여러 개일 때의 메시지 — 파일마다 한 줄, 쓰는 장 번호와 사유. */
+/**
+ * 목적격 조사. 받침이 있으면 '을', 없으면 '를'.
+ * "앱 화면을" / "배경 이미지를" 처럼 대상 이름을 문구에 끼울 때 쓴다.
+ */
+function objectParticle(word) {
+  const code = word.charCodeAt(word.length - 1) - 0xac00;
+  const hasFinal = code >= 0 && code <= 11171 && code % 28 !== 0;
+  return hasFinal ? '을' : '를';
+}
+
+/** 문제가 걸린 자리 표시 — 장 번호는 "1·4번"으로 묶고, 배경 같은 비-장 라벨은 그대로 붙인다. */
+function whereLabel(screens) {
+  const nums = screens.filter((s) => typeof s === 'number');
+  const others = screens.filter((s) => typeof s !== 'number');
+  return [...(nums.length ? [`${nums.join('·')}번`] : []), ...others].join('·');
+}
+
+/** 문제 파일이 여러 개일 때의 메시지 — 파일마다 한 줄, 쓰는 자리와 사유. */
 function imageProblemsMessage(problems) {
-  const lines = problems.map(({ error, screens }) => `  ${error.source} (${screens.join('·')}번) — ${error.reason}`);
+  const lines = problems.map(({ error, screens }) => `  ${error.source} (${whereLabel(screens)}) — ${error.reason}`);
   const hint = problems.some((p) => p.error.kind === 'missing')
     ? "\n  없는 화면은 'appshot capture'로 캡처하거나 --placeholder로 자리표시자를 쓰세요."
     : '';
@@ -166,14 +205,14 @@ function imageProblemsMessage(problems) {
 }
 
 /** 이미지 파일을 data URI로 읽는다. setContent에는 baseURL이 없어 상대 경로가 통하지 않는다. */
-function readImage(source, cwd, device, placeholder, screenNo) {
+function readImage(source, cwd, device, placeholder, screenNo, what = '앱 화면') {
   if (!source) return null;
   const file = path.resolve(cwd, source);
 
   if (!fs.existsSync(file)) {
     if (placeholder) return placeholderImage(device, screenNo);
     throw new ScreenImageError(
-      `앱 화면을 찾을 수 없습니다: ${source}\n` +
+      `${what}${objectParticle(what)} 찾을 수 없습니다: ${source}\n` +
         `  찾은 경로: ${file}\n` +
         `  PNG를 넣거나, 'appshot capture'로 캡처하거나, --placeholder로 자리표시자를 쓰세요.`,
       { source, reason: '파일을 찾을 수 없습니다.', kind: 'missing' },
@@ -197,9 +236,9 @@ function readImage(source, cwd, device, placeholder, screenNo) {
     validateImage(buf);
   } catch (err) {
     throw new ScreenImageError(
-      `앱 화면을 읽을 수 없습니다: ${source}\n` +
+      `${what}${objectParticle(what)} 읽을 수 없습니다: ${source}\n` +
         `  ${err.message}\n` +
-        `  파일을 다시 만들거나 다른 화면을 지정하세요.`,
+        `  파일을 다시 만들거나 다른 ${what}${objectParticle(what)} 지정하세요.`,
       { source, reason: err.message, kind: 'broken' },
     );
   }
