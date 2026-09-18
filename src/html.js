@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import { skillPath } from './paths.js';
-import { frameCSS, frameHTML, plainCSS, plainHTML } from './frame.js';
+import {
+  frameCSS, frameHTML, plainCSS, plainHTML, windowCSS, windowHTML, WINDOW_TITLEBAR,
+} from './frame.js';
 import { getLayout, frameWidthFor, heightPerWidth } from './layouts.js';
 
 /*
@@ -39,15 +41,21 @@ export function buildHTML({ cfg, screen, device, index = 0, total = 1, images = 
 
   // 필드가 없으면 기기 프레임 — deviceFrame이 생기기 전에 만든 config와 호환
   const framed = cfg.theme.deviceFrame !== false;
-  const frameW = frameWidthFor(device, layout, canvas, { framed });
+  // 맥은 기기 프레임이 아니라 앱 창으로 감싼다 (devices.js의 frame.chrome)
+  const windowed = framed && device.frame.chrome === 'window';
+  // 창 목업은 화면 영역을 소스 비율에 맞추므로 폭 역산에도 그 비율을 쓴다 (타이틀바 포함)
+  const screenAspect = windowed && images.main?.size ? images.main.size.h / images.main.size.w : null;
+  const aspect = screenAspect === null ? null : screenAspect + WINDOW_TITLEBAR;
+  const frameW = frameWidthFor(device, layout, canvas, { framed, aspect });
   const usesDevice = screen.layout !== 'fullbleed';
 
-  const imgTag = (src) => `<img class="screen" src="${src}" alt="">`;
-  const wrap = (src) => (framed ? frameHTML(device, imgTag(src)) : plainHTML(imgTag(src)));
+  const imgTag = (img) => `<img class="screen" src="${img.uri}" alt="">`;
+  const wrap = (img) =>
+    windowed ? windowHTML(imgTag(img)) : framed ? frameHTML(device, imgTag(img)) : plainHTML(imgTag(img));
   const body = render(template(layout.template), {
     headline: screen.headline ?? '',
     subhead: screen.subhead ?? '',
-    screenSrc: images.main,
+    screenSrc: images.main.uri,
     device: usesDevice ? wrap(images.main) : '',
     device2: images.second ? wrap(images.second) : '',
   });
@@ -70,11 +78,12 @@ export function buildHTML({ cfg, screen, device, index = 0, total = 1, images = 
   --subhead-weight: ${cfg.theme.subhead.weight ?? 500};
   --subhead-scale: ${(cfg.theme.subhead.size ?? 0.029) * 100};
   --device-w: ${frameW}px;
-  --device-hpw: ${heightPerWidth(device, layout, { framed }).toFixed(5)};
+  --device-hpw: ${heightPerWidth(device, layout, { framed, aspect }).toFixed(5)};
+  --screen-aspect: ${screenAspect ? `${images.main.size.w} / ${images.main.size.h}` : '16 / 10'};
 }
 ${baseCSS()}
 ${backgroundCSS(cfg.theme.background, index, total)}
-${usesDevice ? (framed ? frameCSS(device, frameW) : plainCSS(frameW)) : ''}
+${usesDevice ? (windowed ? windowCSS(frameW) : framed ? frameCSS(device, frameW) : plainCSS(frameW)) : ''}
 </style>
 </head>
 <body>

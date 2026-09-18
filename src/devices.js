@@ -136,6 +136,8 @@ export const DEVICES = {
     canvas: { w: 2880, h: 1800 },
     screen: { w: 2880, h: 1800 },
     frame: {
+      // 노트북 베젤이 아니라 macOS 앱 창으로 감싼다 (frame.js의 windowCSS)
+      chrome: 'window',
       bezel: 0.011,
       radius: 0.016,
       innerRadius: 0.008,

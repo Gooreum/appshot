@@ -41,6 +41,8 @@ export const LAYOUTS = {
     maxWidth: 0.88,
     // 가로 화면에는 글자가 빽빽한 데스크톱 UI가 들어간다. 세로 폰보다 크게 잡아야
     // 스토어 목록에서 화면 내용이 읽힌다. 0.58에서 실물로 보고 올렸다.
+    // 창 목업으로 다시 확인: 0.72·0.78은 카피와 기기 사이 간격(12u) 때문에 창 아래가
+    // 잘린다. 폰은 잘려도 의도지만 창은 고장으로 보이므로 0.64가 상한이다.
     landscape: { deviceHeight: 0.64, minWidth: 0.50, maxWidth: 0.86 },
     screens: 1,
   },
@@ -112,24 +114,31 @@ export function metricsFor(device, layout) {
   return isLandscape(device) && layout.landscape ? { ...layout, ...layout.landscape } : layout;
 }
 
-export function frameWidthFor(device, layout, canvas, { framed = true } = {}) {
+export function frameWidthFor(device, layout, canvas, { framed = true, aspect = null } = {}) {
   const m = metricsFor(device, layout);
   if (!m.deviceHeight) return canvas.w;
 
-  const width = (canvas.h * m.deviceHeight) / heightPerWidth(device, layout, { framed });
+  const width = (canvas.h * m.deviceHeight) / heightPerWidth(device, layout, { framed, aspect });
 
-  return Math.round(Math.min(Math.max(width, canvas.w * m.minWidth), canvas.w * m.maxWidth));
+  // minWidth 하한은 "기기가 너무 작아지는 것"을 막는 값이고, 하한에 걸리면 기기는 캔버스를
+  // 넘어 잘린다 — 폰은 하단이 잘리는 것이 caption-top의 의도된 모습이다.
+  // 창 목업(aspect 지정)에는 하한을 적용하지 않는다: 잘린 앱 창은 의도가 아니라 고장으로 보이고,
+  // 세로로 긴 창(3:4)은 하한 때문에 높이가 캔버스의 109%가 됐다.
+  const floor = aspect === null ? canvas.w * m.minWidth : 0;
+  return Math.round(Math.min(Math.max(width, floor), canvas.w * m.maxWidth));
 }
 
 /**
  * 기기 폭 1px당 화면에 차지하는 높이 (회전 후 bounding box 기준).
  * 템플릿은 이 값으로 "남은 공간에 들어가는 최대 폭"을 CSS에서 계산한다.
  */
-export function heightPerWidth(device, layout, { framed = true } = {}) {
+export function heightPerWidth(device, layout, { framed = true, aspect = null } = {}) {
   const f = device.frame;
-  const screenRatio = device.screen.h / device.screen.w;
+  // aspect가 오면 그 값이 이미 기기 박스 전체의 높이/폭이다
+  // (창 목업은 소스 비율 + 타이틀바). 창 캡처는 기기 화면 비율과 무관하므로 그쪽을 쓴다.
+  const screenRatio = aspect ?? device.screen.h / device.screen.w;
   // 홈버튼 세대는 위아래 베젤(chin)이 좌우와 다르다
-  const vPad = !framed ? 0 : f.chin ? f.chin.top + f.chin.bottom : f.bezel * 2;
+  const vPad = aspect !== null || !framed ? 0 : f.chin ? f.chin.top + f.chin.bottom : f.bezel * 2;
   const t = ((layout.rotate ?? 0) * Math.PI) / 180;
   return (screenRatio + vPad) * Math.cos(t) + Math.sin(t);
 }

@@ -335,7 +335,7 @@ export function imageSize(file) {
   return sizeFromBuffer(fs.readFileSync(file));
 }
 
-function sizeFromBuffer(buf) {
+export function sizeFromBuffer(buf) {
   // PNG: 8바이트 시그니처 + IHDR 길이/타입(8) → 오프셋 16부터 width, height
   if (buf.length > 24 && buf.toString('hex', 0, 8) === '89504e470d0a1a0a') {
     return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };

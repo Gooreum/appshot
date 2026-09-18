@@ -38,9 +38,9 @@ export function defaultConfig(opts = {}) {
       subhead: { color: 'rgba(255,255,255,0.86)', size: 0.029, weight: 500 },
       fontStack: FONT_STACK,
       // Google Play는 폰 스크린샷에 기기 이미지를 피하라고 권장한다 (App Store는 허용).
-      // macOS도 기본으로 끈다 — Mac 스크린샷에 넣는 것은 바탕화면이 아니라 앱 **창**이고,
-      // 창을 노트북 베젤 안에 넣으면 바탕화면이 없어 어색해진다.
-      deviceFrame: platform === 'ios',
+      // macOS는 노트북 베젤이 아니라 앱 **창**(신호등 있는 macOS 창)으로 감싼다 —
+      // 바탕화면이 필요 없고, 창 캡처 비율이 제각각이어도 창이 그 비율을 따라간다.
+      deviceFrame: platform !== 'android',
     },
     // Play 추천 영역에 노출되려면 스크린샷이 4장 이상이어야 한다
     // 호출마다 새 객체 — 반환된 config를 고쳐도 다음 기본값에 번지지 않게

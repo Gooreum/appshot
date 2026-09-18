@@ -4,7 +4,7 @@ import { chromium } from 'playwright';
 import { getDevice } from './devices.js';
 import { getLayout } from './layouts.js';
 import { buildHTML } from './html.js';
-import { checkAll, checkCopyArea, validateImage } from './quality.js';
+import { checkAll, checkCopyArea, sizeFromBuffer, validateImage } from './quality.js';
 
 const MIME = {
   '.png': 'image/png',
@@ -204,7 +204,8 @@ function readImage(source, cwd, device, placeholder, screenNo) {
     );
   }
 
-  return `data:${mime};base64,${buf.toString('base64')}`;
+  // size는 창 목업이 화면 영역 비율을 소스에 맞추는 데 쓴다 (읽지 못하면 null)
+  return { uri: `data:${mime};base64,${buf.toString('base64')}`, size: sizeFromBuffer(buf) };
 }
 
 /**
@@ -223,7 +224,8 @@ function placeholderImage(device, screenNo) {
           font-family="-apple-system, sans-serif" font-size="${Math.round(w / 11)}"
           font-weight="600">화면 ${screenNo}</text>
   </svg>`;
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  // 자리표시자는 기기 화면 비율로 그리므로 size를 따로 넘기지 않아도 된다
+  return { uri: `data:image/svg+xml,${encodeURIComponent(svg)}`, size: null };
 }
 
 export { PREVIEW_SCALE };

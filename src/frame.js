@@ -252,6 +252,82 @@ export function plainCSS(W) {
 }`.trim();
 }
 
+/**
+ * 창 상단 바 높이와 모서리 반경 (창 폭 대비). macOS 타이틀바는 1200pt 창에서 약 28pt다.
+ * 창 전체 높이는 "소스 비율 + TITLEBAR"이므로 크기 역산에도 이 값이 필요하다.
+ */
+export const WINDOW_TITLEBAR = 0.035;
+const TITLEBAR = WINDOW_TITLEBAR;
+const WINDOW_RADIUS = 0.012;
+
+/**
+ * macOS 앱 창 목업 — 신호등 버튼 + 상단 바 + 앱 화면.
+ *
+ * 화면 영역은 --screen-aspect(실제 소스 비율)를 따른다. 창 캡처는 비율이 제각각이라
+ * 16:10으로 고정하면 창 가장자리가 잘리거나 좌우에 빈 띠가 생긴다.
+ */
+export function windowCSS(W) {
+  const bar = W * TITLEBAR;
+  const dot = bar * 0.3;
+  const radius = px(W * WINDOW_RADIUS);
+  return `
+.device {
+  position: relative;
+  width: ${px(W)};
+  border-radius: ${radius};
+  overflow: hidden;
+  background: #E8E8ED;
+  ${shadowCSS(W)}
+}
+
+.titlebar {
+  height: ${px(bar)};
+  display: flex;
+  align-items: center;
+  gap: ${px(dot * 0.7)};
+  padding-left: ${px(bar * 0.42)};
+  background: linear-gradient(180deg, #F6F6F8, #E4E4E9);
+  border-bottom: ${px(Math.max(1, W * 0.0006))} solid rgba(0, 0, 0, 0.12);
+}
+
+.dot {
+  width: ${px(dot)};
+  height: ${px(dot)};
+  border-radius: 50%;
+}
+
+.dot-close { background: #FF5F57; }
+.dot-min { background: #FEBC2E; }
+.dot-max { background: #28C840; }
+
+.screen-clip {
+  position: relative;
+  aspect-ratio: var(--screen-aspect, 16 / 10);
+  overflow: hidden;
+  line-height: 0;
+  background: #000;
+}
+
+.screen {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}`.trim();
+}
+
+/** 창 목업 마크업. */
+export function windowHTML(screenImgTag) {
+  return `<div class="device device--window">
+  <div class="titlebar">
+    <span class="dot dot-close"></span><span class="dot dot-min"></span><span class="dot dot-max"></span>
+  </div>
+  <div class="screen-clip">
+    ${screenImgTag}
+  </div>
+</div>`;
+}
+
 /** 프레임 없는 카드 마크업. */
 export function plainHTML(screenImgTag) {
   return `<div class="device device--plain">
