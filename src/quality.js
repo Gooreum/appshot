@@ -28,7 +28,8 @@ const RATIO_TOLERANCE = 0.03;
 const CJK = /[ᄀ-ᇿ㄰-㆏가-힯぀-ヿ一-鿿]/;
 
 /** 스토어별 업로드 가능 최대 장수와, Play 추천 영역 노출에 필요한 최소 장수. */
-const MAX_SCREENS = { ios: 10, android: 8 };
+const MAX_SCREENS = { ios: 10, macos: 10, android: 8 };
+const STORE_LABEL = { ios: 'App Store', macos: 'Mac App Store', android: 'Google Play' };
 const PLAY_RECOMMEND_MIN = 4;
 
 /** 카피가 이미지에서 차지해도 되는 최대 면적 (Google Play: "not more than 20% of the image"). */
@@ -158,11 +159,11 @@ function checkRestricted(screen, cfg, i, add) {
 }
 
 function checkCount(cfg, add) {
-  const store = cfg.platform === 'android' ? 'android' : 'ios';
+  const store = MAX_SCREENS[cfg.platform] ? cfg.platform : 'ios';
   const n = cfg.screens.length;
   if (n > MAX_SCREENS[store]) {
     add(null, 'count-max',
-      `스크린샷이 ${n}장입니다. ${store === 'android' ? 'Google Play' : 'App Store'}는 기기 유형당 최대 ${MAX_SCREENS[store]}장까지 올릴 수 있습니다.`);
+      `스크린샷이 ${n}장입니다. ${STORE_LABEL[store]}는 기기 유형당 최대 ${MAX_SCREENS[store]}장까지 올릴 수 있습니다.`);
   }
   if (store === 'android' && n < PLAY_RECOMMEND_MIN) {
     add(null, 'count-recommend',
@@ -305,11 +306,13 @@ function checkSource(screen, cfg, device, layout, cwd, i, add) {
     const size = imageSize(file);
     if (!size) continue;
 
-    // 비율: 앱 화면이 늘어나 보이는 가장 흔한 사고
+    // 비율: 앱 화면이 늘어나 보이는 가장 흔한 사고.
+    // 맥은 예외다 — 넣는 것이 화면이 아니라 앱 **창**이라 비율이 제각각이고,
+    // 창 목업이 그 비율에 맞춰 그려지므로 늘어나지 않는다.
     const expected = device.screen.h / device.screen.w;
     const actual = size.h / size.w;
     const drift = Math.abs(actual - expected) / expected;
-    if (drift > RATIO_TOLERANCE) {
+    if (cfg.platform !== 'macos' && drift > RATIO_TOLERANCE) {
       add(i, 'source-ratio',
         `${src}의 비율이 ${device.label} 화면과 ${(drift * 100).toFixed(0)}% 다릅니다 ` +
         `(${size.w}×${size.h} vs 기대 ${device.screen.w}×${device.screen.h}). 화면이 늘어나 보일 수 있습니다.`);
