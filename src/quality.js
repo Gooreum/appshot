@@ -55,6 +55,7 @@ export function checkAll(cfg, device, cwd = process.cwd()) {
     checkRestricted(screen, cfg, i, add);
   });
 
+  checkBackground(cfg, device, cwd, add);
   checkCount(cfg, add);
   checkDeviceImagery(cfg, add);
   if (tabletText) checkTabletText(cfg, add);
@@ -156,6 +157,45 @@ function checkRestricted(screen, cfg, i, add) {
       add(i, `restricted-${rule.kind}`,
         `${label}의 "${(m[0] + rest).trim()}" — ${rule.kind} 표현은 ${POLICY_SOURCE[store]}.`);
     }
+  }
+}
+
+/** 배경 이미지가 cover로 채워질 때 허용하는 비율 차이. 이를 넘으면 가장자리가 눈에 띄게 잘린다. */
+const BG_CROP_TOLERANCE = 0.2;
+
+/**
+ * 배경 이미지 점검.
+ *
+ * 대비는 여전히 검사하지 못한다 — 사진은 부분마다 밝기가 달라 한 색으로 비교할 수 없다.
+ * (그래서 html.js가 가독성 마스크를 기본으로 씌운다.)
+ * 대신 측정 가능한 두 가지(해상도·잘림)와 배경이 아예 안 보이는 조합을 잡는다.
+ */
+function checkBackground(cfg, device, cwd, add) {
+  const bg = cfg.theme.background;
+  if (bg?.type !== 'image' || !bg.source) return;
+
+  const file = path.resolve(cwd, bg.source);
+  if (!fs.existsSync(file)) return; // 존재 여부는 render가 더 명확히 알려준다
+  const size = imageSize(file);
+
+  if (size && size.w < device.canvas.w) {
+    add(null, 'bg-lowres',
+      `배경 이미지 폭이 ${size.w}px으로 캔버스 ${device.canvas.w}px보다 작습니다. 확대되어 흐려집니다.`);
+  }
+
+  if (size && (bg.fit ?? 'cover') === 'cover') {
+    const expected = device.canvas.h / device.canvas.w;
+    const drift = Math.abs(size.h / size.w - expected) / expected;
+    if (drift > BG_CROP_TOLERANCE) {
+      add(null, 'bg-crop',
+        `배경 이미지 비율이 캔버스와 ${(drift * 100).toFixed(0)}% 다릅니다 (${size.w}×${size.h}). ` +
+        'cover로 채우면 가장자리가 잘립니다. fit을 contain으로 두거나 캔버스 비율에 맞춰 만드세요.');
+    }
+  }
+
+  if (cfg.screens.every((s) => s.layout === 'fullbleed')) {
+    add(null, 'bg-unused',
+      '모든 장이 fullbleed라 배경 이미지가 보이지 않습니다 (fullbleed는 앱 화면이 배경입니다).');
   }
 }
 
