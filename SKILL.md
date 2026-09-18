@@ -45,6 +45,14 @@ AskUserQuestion으로 묻는다: **Apple (App Store)** / **Mac (Mac App Store)**
 **"맥 앱", "맥북 앱"은 `macos`다** — `ios`가 아니다. Mac App Store는 기기 슬롯이 없고
 16:10 **가로** 규격(2880×1800)이라 레이아웃 치수가 세로 기기와 따로 잡혀 있다.
 
+```bash
+node ~/.claude/skills/appshot/bin/appshot.mjs init --platform macos
+```
+
+맥은 **창 목업**이 기본이다 — 신호등 버튼이 있는 macOS 앱 창으로 화면을 감싼다.
+창 캡처가 16:10이 아니어도(4:3, 21:9 등) 창이 그 비율을 그대로 따라가므로 잘리지 않는다.
+그래서 맥에서는 소스 비율 경고를 띄우지 않는다. 화면만 보여주려면 `theme.deviceFrame: false`.
+
 ### 3단계 — 디바이스 선택
 
 ```bash
@@ -80,6 +88,14 @@ MacBook 목업은 Mac App Store에서 **필수가 아니다** — 앱 창만 올
 node ~/.claude/skills/appshot/bin/appshot.mjs capture --platform ios
 ```
 adb가 없으면 실패가 아니라 "PNG를 직접 넣으세요" 안내가 나온다. 그때는 (a)로 유도한다.
+
+**맥은 창을 클릭해 찍는다:**
+```bash
+node ~/.claude/skills/appshot/bin/appshot.mjs capture --platform macos
+```
+실행하면 커서가 카메라로 바뀐다. **사용자가 찍을 앱 창을 클릭해야** 하므로, 실행 전에
+"찍을 창을 클릭하세요"라고 사용자에게 알려준다 (esc로 취소). 화면 전체를 찍지 않으므로
+다른 창이 들어갈 일이 없다. 화면 기록 권한이 없으면 그 안내가 나온다.
 
 **macOS는 자동 캡처가 없다.** 어느 창을 찍을지는 사람만 안다:
 ```bash
@@ -158,11 +174,11 @@ node ~/.claude/skills/appshot/bin/appshot.mjs render
 ## 커맨드 요약
 
 ```
-doctor     환경 점검 (playwright / chromium / simctl / adb)
+doctor     환경 점검 (playwright / chromium / simctl / screencapture / adb)
 init       appshot.config.json + screens/ 생성   [--platform] [--device] [--force]
 devices    디바이스와 스토어 규격 목록            [--platform] [--json]
 layouts    레이아웃 5종 설명                     [--json]
-capture    시뮬레이터/기기에서 화면 캡처          --platform ios|android [--name]
+capture    시뮬레이터/기기/맥 창에서 화면 캡처     --platform ios|macos|android [--name]
 render     스토어 스크린샷 생성                  [--only 1,3] [--preview] [--placeholder]
 ```
 
