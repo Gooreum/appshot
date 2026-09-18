@@ -37,8 +37,10 @@ export function buildHTML({ cfg, screen, device, index = 0, total = 1, images = 
   const layout = getLayout(screen.layout);
   const canvas = cfg.canvasOverride ?? device.canvas;
   images = {
+    ...images, // background 등 다른 키를 잃지 않게
     main: images.main ? asImage(images.main) : null,
     second: images.second ? asImage(images.second) : null,
+    background: images.background ? asImage(images.background) : null,
   };
 
   if (layout.screens > 1 && !images.second) {
@@ -93,7 +95,7 @@ export function buildHTML({ cfg, screen, device, index = 0, total = 1, images = 
   --screen-aspect: ${screenAspect ? `${images.main.size.w} / ${images.main.size.h}` : '16 / 10'};
 }
 ${baseCSS()}
-${backgroundCSS(cfg.theme.background, index, total)}
+${backgroundCSS(cfg.theme.background, index, total, images.background)}
 ${usesDevice ? (windowed ? windowCSS(frameW) : framed ? frameCSS(device, frameW) : plainCSS(device, frameW)) : ''}
 </style>
 </head>
@@ -104,14 +106,45 @@ ${body}
 }
 
 /**
+ * 배경 이미지 위 기본 마스크 세기.
+ * 대비를 자동으로 검사할 수 없는 유일한 배경이 사진이라(부분마다 밝기가 다르다),
+ * 기본값을 0으로 두면 카피가 묻힌 결과물이 그대로 나간다. 0으로 끌 수는 있다.
+ */
+const BG_OVERLAY_DEFAULT = 0.28;
+
+/**
  * 배경.
  *
  * panorama가 켜지면 배경 그라디언트를 전체 장수만큼 넓게 그린 뒤
  * 각 장이 그중 자기 구간만 보여준다 — 스토어에서 옆으로 넘길 때
  * 배경이 하나로 이어져 흐르는 인상을 준다.
  */
-function backgroundCSS(bg, index, total) {
+function backgroundCSS(bg, index, total, bgImage = null) {
   if (!bg) return '.bg { background: #111; }';
+
+  // 이미지 배경. bgImage가 없으면(--placeholder로 파일을 건너뛴 경우) 아래 그라디언트로 떨어진다.
+  if (bg.type === 'image' && bgImage) {
+    const panorama = bg.panorama && total > 1;
+    // 파노라마는 배경을 장수만큼 넓게 깔고 각 장이 자기 구간만 보여준다 (그라디언트와 같은 방식)
+    const size = panorama ? `${total * 100}% 100%` : bg.fit === 'contain' ? 'contain' : 'cover';
+    const position = panorama ? `${((index / (total - 1)) * 100).toFixed(4)}% 0` : 'center';
+    const overlay = bg.overlay ?? BG_OVERLAY_DEFAULT;
+    return `.bg {
+  background-image: url("${bgImage.uri}");
+  background-size: ${size};
+  background-position: ${position};
+  background-repeat: no-repeat;
+  background-color: #111; /* contain으로 남는 여백 */
+}${overlay > 0 ? `
+
+/* 가독성 마스크 — 배경 사진은 부분마다 밝기가 달라 카피가 묻히는 사고가 가장 흔하다 */
+.bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, ${overlay});
+}` : ''}`;
+  }
 
   if (bg.type === 'solid') {
     return `.bg { background: ${bg.from ?? '#111'}; }`;
