@@ -26,9 +26,20 @@ function template(name) {
   return templateCache.get(name);
 }
 
+/**
+ * 이미지 인자를 { uri, size } 형태로 맞춘다.
+ * render는 크기까지 넘기지만, data URI 문자열만 넘기는 호출도 계속 받는다 —
+ * 크기는 창 목업의 비율 계산에만 쓰이므로 없으면 기기 화면 비율로 떨어진다.
+ */
+const asImage = (v) => (typeof v === 'string' ? { uri: v, size: null } : v);
+
 export function buildHTML({ cfg, screen, device, index = 0, total = 1, images = {} }) {
   const layout = getLayout(screen.layout);
   const canvas = cfg.canvasOverride ?? device.canvas;
+  images = {
+    main: images.main ? asImage(images.main) : null,
+    second: images.second ? asImage(images.second) : null,
+  };
 
   if (layout.screens > 1 && !images.second) {
     throw new Error(
