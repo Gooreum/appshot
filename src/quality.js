@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { getLayout, frameWidthFor } from './layouts.js';
+import { WINDOW_TITLEBAR } from './frame.js';
 
 /**
  * 품질 게이트.
@@ -318,8 +319,13 @@ function checkSource(screen, cfg, device, layout, cwd, i, add) {
         `(${size.w}×${size.h} vs 기대 ${device.screen.w}×${device.screen.h}). 화면이 늘어나 보일 수 있습니다.`);
     }
 
-    // 해상도: 프레임 렌더 폭보다 작으면 업스케일되어 뭉갠다
-    const frameW = frameWidthFor(device, layout, device.canvas, { framed: cfg.theme.deviceFrame !== false });
+    // 해상도: 프레임 렌더 폭보다 작으면 업스케일되어 뭉갠다.
+    // 창 목업은 소스 비율에 따라 폭이 달라지므로 그 비율로 계산해야 한다 —
+    // 기기 화면 비율로 재면 4:3 창에서 렌더 폭을 1781px로 잡아(실제 1468px) 오탐이 났다.
+    const framed = cfg.theme.deviceFrame !== false;
+    const aspect =
+      framed && device.frame.chrome === 'window' ? size.h / size.w + WINDOW_TITLEBAR : null;
+    const frameW = frameWidthFor(device, layout, device.canvas, { framed, aspect });
     if (size.w < frameW) {
       add(i, 'source-lowres',
         `${src}의 폭이 ${size.w}px으로 렌더 폭 ${frameW}px보다 작습니다. 확대되어 흐려집니다.`);
