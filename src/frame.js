@@ -233,9 +233,9 @@ const PLAIN_RADIUS = 0.05;
  * ("can become obsolete quickly or alienate some users").
  * 클래스명을 .device로 유지해서 레이아웃 템플릿의 회전·겹침 규칙을 그대로 쓴다.
  *
- * **반경을 0에 가깝게 두지 않는다.** 창 캡처(`screencapture -o`)는 모서리가 이미 둥글고
- * 그 바깥이 투명인데 `.screen-clip` 배경이 검정이라, CSS 반경이 소스 자체 반경보다
- * 작으면 모서리에 검은 삼각형이 드러난다.
+ * **여기서 `border-radius`는 모양이 아니라 그림자 모양을 정한다.** 창 캡처는 이미
+ * 자기 모서리가 파여 있고 그 바깥이 투명이라, 화면에 보이는 실루엣은 소스가 만든다.
+ * 이 반경은 `.device`의 `box-shadow`가 따라가는 윤곽일 뿐이다.
  */
 export function plainCSS(device, W) {
   const radius = px(W * (device.frame.plainRadius ?? PLAIN_RADIUS));
@@ -252,7 +252,17 @@ export function plainCSS(device, W) {
   overflow: hidden;
   border-radius: ${radius};
   line-height: 0;
-  background: #000;
+  /*
+   * **배경을 칠하지 않는다.** 창 캡처(screencapture -o)는 모서리가 스퀘어클(연속 곡률)로
+   * 파여 있고 그 바깥이 투명이다. 여기에 색을 깔면 그 투명 영역이 그 색으로 드러난다 —
+   * 실제로 #000이었을 때 모서리에 검은 초승달이 생겼다.
+   *
+   * 원형 border-radius로 그 영역을 덮으려 하면 안 된다. 스퀘어클은 가장자리 쪽으로 더
+   * 파고들어서(실측: 대각선 기준 반경 54.6px인데 맨 윗행은 72px부터 불투명) 다 덮으려면
+   * 실제 곡률보다 훨씬 둥글게 잡아야 한다. 비워 두면 배경이 그대로 비쳐 그 문제가 없어진다.
+   *
+   * 기기 프레임(frameCSS)은 반대다 — 거기서는 화면 뒤가 검어야 하므로 #000을 유지한다.
+   */
 }
 
 .screen {
