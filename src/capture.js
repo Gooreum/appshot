@@ -151,6 +151,41 @@ export function captureIOS(dest, { udid } = {}) {
   return { dest, device: udid ?? booted[0]?.name ?? 'booted', statusBar };
 }
 
+/**
+ * 맥 앱 창 캡처. 사용자가 찍을 창을 클릭한다 (-w 창 모드, -o 그림자 제외).
+ *
+ * "어느 창을 찍을지"는 사람만 아는 것이라 클릭으로 고르게 한다.
+ * 화면 전체를 찍으면 열려 있던 다른 창의 내용이 스토어에 그대로 올라간다.
+ * 그림자는 appshot이 CSS로 그리므로 -o로 뺀다.
+ */
+export function captureMac(dest, { onPrompt } = {}) {
+  if (process.platform !== 'darwin' || !which('screencapture')) {
+    throw new CaptureUnavailable(
+      '맥 캡처는 macOS에서만 가능합니다.\n  앱 창을 찍은 PNG를 screens/에 직접 넣어주세요.',
+    );
+  }
+
+  onPrompt?.(); // 커서가 카메라로 바뀌기 전에 안내를 먼저 보여준다
+
+  try {
+    execFileSync('screencapture', ['-w', '-o', dest], { stdio: ['inherit', 'ignore', 'pipe'] });
+  } catch (err) {
+    const detail = err.stderr?.toString().trim().split('\n').pop() ?? err.message;
+    throw new Error(
+      `창 캡처에 실패했습니다: ${detail}\n` +
+        '  화면 기록 권한이 필요합니다 — 시스템 설정 → 개인정보 보호 및 보안 → 화면 기록에서\n' +
+        '  터미널(또는 이 앱)을 허용한 뒤 다시 실행하세요.',
+    );
+  }
+
+  // esc로 취소하면 screencapture는 성공 종료하면서 파일을 만들지 않는다
+  if (!fs.existsSync(dest)) {
+    throw new Error('캡처가 취소되었습니다 (esc). 다시 실행하고 찍을 창을 클릭하세요.');
+  }
+
+  return { dest, device: '맥 앱 창', statusBar: null }; // 창 캡처에는 메뉴바가 없다
+}
+
 /** Android 캡처. adb 자체가 없으면 CaptureUnavailable — 실패가 아니라 안내 대상이다. */
 export function captureAndroid(dest, { serial } = {}) {
   const adb = resolveAdb();

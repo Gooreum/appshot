@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { captureIOS, captureAndroid, nextScreenPath, CaptureUnavailable } from '../capture.js';
+import { captureIOS, captureAndroid, captureMac, nextScreenPath, CaptureUnavailable } from '../capture.js';
 import { configPath, CONFIG_NAME } from '../config.js';
 import { PLATFORMS } from '../devices.js';
 
@@ -19,22 +19,6 @@ export async function run({ opts }) {
     return 1;
   }
 
-  // macOS는 자동 캡처를 하지 않는다.
-  // 시뮬레이터와 달리 "어느 창을 찍을지"는 사람만 아는 것이고,
-  // 화면을 통째로 찍으면 열려 있던 다른 창의 내용이 스토어에 그대로 올라간다.
-  // screens/를 만들기 전에 빠져나가야 빈 폴더가 남지 않는다.
-  if (platform === 'macos') {
-    console.log(`
-  macOS는 자동 캡처를 지원하지 않습니다. 앱 창만 찍어 screens/에 넣으세요:
-
-    screencapture -o -l <창 ID> screens/01.png
-
-  -o는 창 그림자를 뺍니다 (appshot이 CSS로 그림자를 따로 줍니다).
-  ⚠️ 화면 전체를 찍지 마세요 — 다른 창의 내용이 스토어에 그대로 올라갑니다.
-`);
-    return 0;
-  }
-
   const dir = path.join(cwd, 'screens');
   const dest = opts.name
     ? path.join(dir, opts.name.endsWith('.png') ? opts.name : `${opts.name}.png`)
@@ -44,12 +28,18 @@ export async function run({ opts }) {
   try {
     const { device, statusBar } = platform === 'ios'
       ? captureIOS(dest, { udid: opts.udid })
-      : captureAndroid(dest, { serial: opts.serial });
+      : platform === 'macos'
+        ? captureMac(dest, { onPrompt: () => console.log('\n  찍을 창을 클릭하세요… (esc로 취소)') })
+        : captureAndroid(dest, { serial: opts.serial });
 
     const { size } = fs.statSync(dest);
     console.log(`\n  캡처 완료 — ${path.relative(cwd, dest)}  (${(size / 1024).toFixed(0)}KB)`);
     console.log(`  기기: ${device}`);
-    console.log(`  상태바: ${STATUS_BAR_NOTE[String(statusBar)] ?? STATUS_BAR_NOTE.false}\n`);
+    // 창 캡처(statusBar null)에는 메뉴바가 없어서 정리할 상태바가 없다
+    if (statusBar !== null) {
+      console.log(`  상태바: ${STATUS_BAR_NOTE[String(statusBar)] ?? STATUS_BAR_NOTE.false}`);
+    }
+    console.log('');
     return 0;
   } catch (err) {
     // 도구 자체가 없는 것은 실패가 아니다 — PNG를 직접 넣으면 된다

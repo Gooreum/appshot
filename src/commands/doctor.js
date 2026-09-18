@@ -64,7 +64,13 @@ export async function run() {
       : 'not available',
     'iOS 자동 캡처만 불가 — PNG를 screens/에 직접 넣으면 됩니다'));
 
-  // 5) Android 캡처 (선택 기능)
+  // 5) 맥 창 캡처 (선택 기능)
+  const hasScreencapture = process.platform === 'darwin' && Boolean(which('screencapture'));
+  lines.push(row(hasScreencapture, 'screencapture (맥)',
+    hasScreencapture ? 'available (창 클릭 캡처)' : 'not available',
+    '맥 자동 캡처만 불가 — 앱 창 PNG를 screens/에 직접 넣으면 됩니다'));
+
+  // 6) Android 캡처 (선택 기능)
   const adb = resolveAdb();
   lines.push(row(Boolean(adb), 'adb (Android)', adb ? shorten(adb) : 'not found',
     'Android 자동 캡처만 불가 — PNG를 screens/에 직접 넣으면 됩니다'));
