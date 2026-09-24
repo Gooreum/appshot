@@ -10,67 +10,74 @@
  * 여기서 W(픽셀)를 곱해 실제 치수로 바꾼다.
  */
 
-/** 금속 밴드 두께 (프레임 폭 대비). 나머지 베젤은 검은 유리(GLASS)로 칠한다. */
-const BAND = 0.007;
-const GLASS = '#050507';
-
+/**
+ * 소재별 색. 금속 밴드 단면을 실물 목업(shots.so의 iPhone/iPad)에서 픽셀로 재서 옮겼다.
+ * 바깥에서 안쪽으로: edge(가장자리 선) → dark(바깥쪽 그늘) → mid(밴드 바탕) → light(안쪽 하이라이트)
+ * → groove(유리와 만나는 홈) → glass(베젤).
+ * 예전처럼 밴드를 대각선 그라디언트 한 장으로 칠하면 플라스틱 테두리처럼 보인다 — 실물은 둥근 금속
+ * 단면이라 안쪽 가장자리에 가는 하이라이트가 서고 바로 안쪽이 어두운 홈이다.
+ */
 const MATERIALS = {
-  titanium:
-    'linear-gradient(145deg,#9A9AA0 0%,#3A3A3C 38%,#7C7C82 52%,#2C2C2E 68%,#6E6E73 100%)',
-  aluminum:
-    'linear-gradient(145deg,#EDEDF2 0%,#9A9AA0 40%,#D6D6DC 55%,#7C7C82 72%,#C9C9CF 100%)',
-  'matte-black':
-    'linear-gradient(145deg,#48484A 0%,#1C1C1E 42%,#3A3A3C 58%,#141416 78%,#2C2C2E 100%)',
+  titanium: { edge: '#1b1d27', dark: '#2f3546', mid: '#5d6479', light: '#c7cbe5', groove: '#0c101a', glass: '#000000' },
+  aluminum: { edge: '#5f6166', dark: '#8e9198', mid: '#b9bcc3', light: '#f1f2f5', groove: '#34363a', glass: '#131313' },
+  'matte-black': { edge: '#0b0b0c', dark: '#1d1d20', mid: '#34343a', light: '#83838c', groove: '#050505', glass: '#000000' },
 };
+
+/** 밴드 두께 기본값 (프레임 폭 대비). devices.js의 frame.band가 없을 때. */
+const DEFAULT_BAND = 0.012;
+
+/** 버튼이 본체 밖으로 튀어나오는 깊이 (프레임 폭 대비). 실물 목업 실측 0.7%. */
+const BUTTON_DEPTH = 0.007;
 
 /** 프레임 폭 W(px)에 대한 디바이스 목업 CSS. */
 export function frameCSS(device, W) {
   const f = device.frame;
   const bezel = W * f.bezel;
+  const band = W * (f.band ?? DEFAULT_BAND);
+  const glass = Math.max(0, bezel - band);
   const chin = f.chin;
+  const m = MATERIALS[f.material] ?? MATERIALS['matte-black'];
 
   // 홈버튼 세대는 위아래 베젤이 좌우보다 훨씬 두껍다
   const padTop = chin ? W * chin.top : bezel;
   const padBottom = chin ? W * chin.bottom : bezel;
 
-  const material = MATERIALS[f.material] ?? MATERIALS['matte-black'];
+  /*
+   * 밴드는 .device 바탕(mid) + 안쪽 그림자(바깥 그늘·가장자리 선)로 칠하고,
+   * 하이라이트·홈·유리는 .screen-clip 바깥 box-shadow 링으로 화면 둘레에 겹친다.
+   * 링은 border-radius + spread를 따라가므로 모서리에서도 두께가 일정하다.
+   * overflow: hidden은 자기 box-shadow를 자르지 않는다.
+   * 홈버튼 세대(chin)는 위아래 유리 폭이 달라 링으로 표현할 수 없어 앞면 전체를 유리색으로 칠한다.
+   */
+  const rings = chin
+    ? ''
+    : `box-shadow:
+    0 0 0 ${px(glass)} ${m.glass},
+    0 0 0 ${px(glass + band * 0.14)} ${m.groove},
+    0 0 ${px(band * 0.35)} ${px(glass + band * 0.3)} ${m.light};`;
 
   return `
 .device {
   position: relative;
   width: ${px(W)};
-  padding: ${px(padTop)} ${px(bezel)} ${px(padBottom)};
+  padding: ${chin ? `${px(padTop - band)} ${px(glass)} ${px(padBottom - band)}` : `${px(padTop)} ${px(bezel)} ${px(padBottom)}`};
   border-radius: ${px(W * f.radius)};
-  background: ${material};
-  /* 버튼은 반투명 그라디언트였을 때 배경색에 묻혀 사실상 보이지 않았다 — 본체와 같은 불투명 소재로 */
-  --btn-material: ${material};
-  ${shadowCSS(W)}
+  background: ${chin ? m.glass : m.mid};
+  ${chin ? `border: ${px(band)} solid ${m.mid};` : ''}
+  --band: ${f.band ?? DEFAULT_BAND};
+  box-shadow:
+    inset 0 0 0 ${px(Math.max(1, W * 0.0012))} ${m.edge},
+    inset 0 0 ${px(band * 0.9)} ${px(band * 0.15)} ${m.dark},
+    ${shadowLayers(W)};
 }
 
-/* 프레임 안쪽 미세한 하이라이트 — 금속 테두리의 광택 */
-.device::before {
-  content: '';
-  position: absolute;
-  inset: ${px(W * 0.0016)};
-  border-radius: ${px(W * f.radius - W * 0.0016)};
-  background: linear-gradient(145deg, rgba(255,255,255,.28), rgba(255,255,255,0) 26%,
-              rgba(255,255,255,0) 74%, rgba(255,255,255,.14));
-  pointer-events: none;
-}
-
-/*
- * 검은 유리 베젤. 패딩(bezel) 전체를 금속으로 칠하면 "회색 테두리 두른 카드"로 보이고
- * 기기로 읽히지 않는다 — 실물은 얇은 금속 밴드 안쪽이 검은 유리다.
- * overflow: hidden은 자기 box-shadow를 자르지 않으므로 spread로 화면 둘레에 링을 두른다.
- * 홈버튼 세대(chin)는 위아래 유리 폭이 달라 균일한 링으로 표현할 수 없어 제외한다.
- */
 .screen-clip {
   position: relative;
   overflow: hidden;
   border-radius: ${px(W * f.innerRadius)};
   line-height: 0;
   background: #000;
-  ${chin ? '' : `box-shadow: 0 0 0 ${px(Math.max(0, bezel - W * BAND))} ${GLASS};`}
+  ${rings}
 }
 
 .screen {
@@ -79,20 +86,16 @@ export function frameCSS(device, W) {
   object-fit: cover;
 }
 
-/* 유리 반사 — 대각선 하이라이트. 4%를 넘기면 화면 내용이 탁해진다 */
+/* 유리 반사. 실물 목업에는 거의 없다 — 세게 넣으면 화면이 뿌옇고 싸 보인다 */
 .glare {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(118deg,
-    rgba(255,255,255,.10) 0%,
-    rgba(255,255,255,0) 34%,
-    rgba(255,255,255,0) 66%,
-    rgba(255,255,255,.045) 100%);
+  background: linear-gradient(118deg, rgba(255,255,255,.035) 0%, rgba(255,255,255,0) 30%);
 }
 ${notchCSS(f.notch, W)}
 ${homeCSS(chin, W)}
-${buttonsCSS(f.buttons, W, f.radius)}
+${buttonsCSS(f.buttons, W, m)}
 `.trim();
 }
 
@@ -171,25 +174,37 @@ function homeCSS(chin, W) {
 }`;
 }
 
-/** 측면 버튼. 프레임 밖으로 살짝 나오는 이 디테일이 실루엣을 실물처럼 만든다. */
-function buttonsCSS(buttons, W, radius) {
+/**
+ * 측면 버튼. 프레임 밖으로 살짝 나오는 이 디테일이 실루엣을 실물처럼 만든다.
+ *
+ * 버튼은 이름(아래 GEOM) 또는 기기별 객체 { side, top|start, len }로 준다.
+ * top/start는 프레임 높이/폭 대비 시작 위치, len은 프레임 폭 대비 길이다.
+ * 실물 목업에서 잰 값은 devices.js에 객체로 둔다 — 기기마다 위치가 달라 이름 하나로는 맞출 수 없다.
+ * 색은 밴드와 같은 소재에, 튀어나온 방향으로 edge→mid→light→dark 그라디언트를 줘 둥근 단면을 흉내 낸다.
+ * (반투명 검정이었을 때는 배경에 묻히거나 검은 덩어리로 보였다)
+ */
+const GEOM = {
+  'power-right': { side: 'right', top: 0.255, len: 0.105 },
+  'volume-right': { side: 'right', top: 0.150, len: 0.070 },
+  'volume-left': { side: 'left', top: 0.195, len: 0.115 },
+  'action-left': { side: 'left', top: 0.135, len: 0.042 },
+  'power-top': { side: 'top', start: 0.14, len: 0.075 },
+  'volume-top': { side: 'top', start: 0.26, len: 0.115 },
+};
+
+function buttonsCSS(buttons, W, m) {
   if (!buttons?.length) return '\n.btn { display: none; }';
 
-  const depth = W * 0.0075;
-  const geom = {
-    'power-right': { side: 'right', top: 0.255, len: 0.105 },
-    'volume-right': { side: 'right', top: 0.150, len: 0.070 },
-    'volume-left': { side: 'left', top: 0.195, len: 0.115 },
-    'action-left': { side: 'left', top: 0.135, len: 0.042 },
-    'power-top': { side: 'top', start: 0.14, len: 0.075 },
-    'volume-top': { side: 'top', start: 0.26, len: 0.115 },
-  };
+  const depth = W * BUTTON_DEPTH;
+  // 버튼의 안쪽 절반은 본체 뒤에 가려진다 — 하이라이트를 보이는 바깥 절반(0~50%) 안에 둔다
+  const shade = (dir) =>
+    `linear-gradient(${dir}, ${m.edge} 0%, ${m.mid} 14%, ${m.light} 30%, ${m.mid} 44%, ${m.dark} 50%)`;
 
   const rules = buttons
-    .map((name, i) => {
-      const g = geom[name];
+    .map((b, i) => {
+      const g = typeof b === 'string' ? GEOM[b] : b;
       if (!g) return '';
-      const cls = `.btn-${name}`;
+      const cls = `.btn-${i}`;
       if (g.side === 'top') {
         return `${cls} {
   position: absolute;
@@ -198,7 +213,7 @@ function buttonsCSS(buttons, W, radius) {
   width: ${px(W * g.len)};
   height: ${px(depth * 2)};
   border-radius: ${px(depth)} ${px(depth)} 0 0;
-  background: var(--btn-material);
+  background: ${shade('to bottom')};
   z-index: -1;
 }`;
       }
@@ -210,7 +225,7 @@ function buttonsCSS(buttons, W, radius) {
   width: ${px(depth * 2)};
   height: ${px(W * g.len)};
   border-radius: ${isLeft ? `${px(depth)} 0 0 ${px(depth)}` : `0 ${px(depth)} ${px(depth)} 0`};
-  background: var(--btn-material);
+  background: ${shade(isLeft ? 'to right' : 'to left')};
   z-index: -1;
 }`;
     })
@@ -223,11 +238,14 @@ function buttonsCSS(buttons, W, radius) {
  * 접지(contact) / 주광(key) / 환경광(ambient) 3단 그림자 —
  * 한 겹짜리 그림자는 스티커처럼 보인다.
  */
-function shadowCSS(W) {
-  return `box-shadow:
-    0 ${px(W * 0.012)} ${px(W * 0.028)} rgba(0,0,0,.22),
+function shadowLayers(W) {
+  return `0 ${px(W * 0.012)} ${px(W * 0.028)} rgba(0,0,0,.22),
     0 ${px(W * 0.055)} ${px(W * 0.110)} rgba(0,0,0,.28),
-    0 ${px(W * 0.160)} ${px(W * 0.300)} rgba(0,0,0,.20);`;
+    0 ${px(W * 0.160)} ${px(W * 0.300)} rgba(0,0,0,.20)`;
+}
+
+function shadowCSS(W) {
+  return `box-shadow:\n    ${shadowLayers(W)};`;
 }
 
 /**
@@ -373,7 +391,9 @@ export function plainHTML(screenImgTag) {
 /** 프레임 마크업. img 태그 문자열을 받아 화면 자리에 넣는다. */
 export function frameHTML(device, screenImgTag) {
   const f = device.frame;
-  const buttons = (f.buttons ?? []).map((b) => `<span class="btn btn-${b}"></span>`).join('');
+  const buttons = (f.buttons ?? [])
+    .map((b, i) => `<span class="btn btn-${i}" data-name="${typeof b === 'string' ? b : `${b.side}-${i}`}"></span>`)
+    .join('');
   const home = f.chin?.home ? '<span class="home"></span>' : '';
   return `<div class="device">
   <div class="screen-clip">
@@ -388,4 +408,4 @@ export function frameHTML(device, screenImgTag) {
 /** 소수점 3자리로 자른 px 문자열. 서브픽셀 값이 CSS에 그대로 흘러가지 않게. */
 const px = (n) => `${Math.round(n * 1000) / 1000}px`;
 
-export { MATERIALS, BAND };
+export { MATERIALS };

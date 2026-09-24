@@ -30,12 +30,20 @@ export const DEVICES = {
     canvas: { w: 1290, h: 2796 },
     screen: { w: 1290, h: 2796 },
     frame: {
-      bezel: 0.021,
-      radius: 0.115,
-      innerRadius: 0.104,
+      // 실물 목업(shots.so iPhone) 실측: 밴드 1.4%, 밴드+유리 베젤 3.7%, 화면 모서리가 크게 둥글다
+      bezel: 0.037,
+      band: 0.015,
+      radius: 0.165,
+      innerRadius: 0.13,
       material: 'titanium',
       notch: { type: 'dynamic-island', w: 0.093, h: 0.028, top: 0.021 },
-      buttons: ['action-left', 'volume-left', 'power-right'],
+      // top: 프레임 높이 대비, len: 프레임 폭 대비 — 실물 목업에서 잰 위치
+      buttons: [
+        { side: 'left', top: 0.206, len: 0.094 }, // 액션 버튼
+        { side: 'left', top: 0.286, len: 0.155 }, // 볼륨 업
+        { side: 'left', top: 0.380, len: 0.155 }, // 볼륨 다운
+        { side: 'right', top: 0.312, len: 0.245 }, // 측면 버튼
+      ],
     },
   },
 
@@ -50,12 +58,18 @@ export const DEVICES = {
     canvas: { w: 1284, h: 2778 },
     screen: { w: 1284, h: 2778 },
     frame: {
-      bezel: 0.024,
-      radius: 0.112,
-      innerRadius: 0.100,
+      bezel: 0.040,
+      band: 0.014,
+      radius: 0.158,
+      innerRadius: 0.12,
       material: 'aluminum',
       notch: { type: 'notch', w: 0.36, h: 0.072 },
-      buttons: ['volume-left', 'power-right'],
+      buttons: [
+        { side: 'left', top: 0.190, len: 0.060 }, // 무음 스위치
+        { side: 'left', top: 0.270, len: 0.150 },
+        { side: 'left', top: 0.360, len: 0.150 },
+        { side: 'right', top: 0.300, len: 0.230 },
+      ],
     },
   },
 
@@ -70,6 +84,7 @@ export const DEVICES = {
     screen: { w: 1242, h: 2208 },
     frame: {
       bezel: 0.030,
+      band: 0.012,
       radius: 0.075,
       innerRadius: 0.006,
       material: 'aluminum',
@@ -89,12 +104,19 @@ export const DEVICES = {
     canvas: { w: 2064, h: 2752 },
     screen: { w: 2064, h: 2752 },
     frame: {
-      bezel: 0.028,
-      radius: 0.052,
-      innerRadius: 0.030,
+      // 실물 목업(shots.so iPad) 실측: 은색 밴드 0.4% + 짙은 회색 유리 베젤, 합쳐 4.3%.
+      // 화면 모서리는 작고(1.7%) 바깥 모서리는 크다(6.3%)
+      bezel: 0.043,
+      band: 0.005,
+      radius: 0.063,
+      innerRadius: 0.018,
       material: 'aluminum',
       notch: { type: 'none' },
-      buttons: ['power-top', 'volume-top'],
+      buttons: [
+        { side: 'top', start: 0.84, len: 0.075 }, // 상단 버튼 (세로로 들었을 때 오른쪽 위)
+        { side: 'right', top: 0.075, len: 0.065 }, // 볼륨 업
+        { side: 'right', top: 0.115, len: 0.065 }, // 볼륨 다운
+      ],
     },
   },
 
@@ -107,12 +129,17 @@ export const DEVICES = {
     canvas: { w: 1668, h: 2388 },
     screen: { w: 1668, h: 2388 },
     frame: {
-      bezel: 0.036,
-      radius: 0.058,
-      innerRadius: 0.030,
+      bezel: 0.048,
+      band: 0.005,
+      radius: 0.068,
+      innerRadius: 0.020,
       material: 'aluminum',
       notch: { type: 'none' },
-      buttons: ['power-top', 'volume-top'],
+      buttons: [
+        { side: 'top', start: 0.82, len: 0.08 },
+        { side: 'right', top: 0.08, len: 0.07 },
+        { side: 'right', top: 0.125, len: 0.07 },
+      ],
     },
   },
 
@@ -167,8 +194,9 @@ export const DEVICES = {
     canvas: { w: 1080, h: 1920 },
     screen: { w: 1008, h: 2244 },
     frame: {
-      bezel: 0.019,
-      radius: 0.098,
+      bezel: 0.030,
+      band: 0.012,
+      radius: 0.118,
       innerRadius: 0.090,
       material: 'matte-black',
       notch: { type: 'punch-hole', d: 0.056, top: 0.017, x: 0.5 },
@@ -185,8 +213,9 @@ export const DEVICES = {
     canvas: { w: 1080, h: 1920 },
     screen: { w: 1080, h: 2424 },
     frame: {
-      bezel: 0.022,
-      radius: 0.085,
+      bezel: 0.032,
+      band: 0.012,
+      radius: 0.105,
       innerRadius: 0.076,
       material: 'matte-black',
       notch: { type: 'punch-hole', d: 0.060, top: 0.019, x: 0.5 },
@@ -204,8 +233,9 @@ export const DEVICES = {
     screen: { w: 1440, h: 3120 },
     frame: {
       // Ultra는 코너가 각지고 베젤이 얇다 — 이 두 수치가 실루엣을 결정한다
-      bezel: 0.014,
-      radius: 0.038,
+      bezel: 0.024,
+      band: 0.010,
+      radius: 0.054,
       innerRadius: 0.032,
       material: 'titanium',
       notch: { type: 'punch-hole', d: 0.048, top: 0.014, x: 0.5 },
@@ -222,8 +252,9 @@ export const DEVICES = {
     canvas: { w: 1440, h: 2560 }, // Play 대형 화면 가이드: 세로는 9:16, 1080~7680px
     screen: { w: 1848, h: 2960 },
     frame: {
-      bezel: 0.033,
-      radius: 0.045,
+      bezel: 0.040,
+      band: 0.006,
+      radius: 0.066,
       innerRadius: 0.028,
       material: 'matte-black',
       notch: { type: 'none' },

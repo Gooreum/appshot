@@ -9,7 +9,6 @@
  * 측정은 CSS 값이 아니라 최종 PNG 픽셀에서 한다. CSS를 읽으면 "내가 쓴 값을 내가 확인"하는
  * 동어반복이 되어, 이번처럼 값은 맞는데 눈에 안 보이는 경우를 잡지 못한다.
  */
-import { BAND } from './frame.js';
 
 /** 게이트 실패 코드별 사람이 읽을 설명. */
 const MESSAGES = {
@@ -38,7 +37,7 @@ const MIN_BUTTON_DEPTH_PX = 3; // 프리뷰처럼 버튼이 3px 미만이면 샘
 export async function checkFrame(page, png, { allowCrop = false } = {}) {
   const b64 = png.toString('base64');
   return page.evaluate(
-    async ({ b64, allowCrop, BAND, CROP_TOLERANCE, BLEND_MIN, BUTTON_MIN, MIN_BUTTON_DEPTH_PX }) => {
+    async ({ b64, allowCrop, CROP_TOLERANCE, BLEND_MIN, BUTTON_MIN, MIN_BUTTON_DEPTH_PX }) => {
       const shot = new Image();
       shot.src = `data:image/png;base64,${b64}`;
       await shot.decode();
@@ -102,7 +101,7 @@ export async function checkFrame(page, png, { allowCrop = false } = {}) {
         const W = dev.offsetWidth, H = dev.offsetHeight;
         const clip = dev.querySelector('.screen-clip');
         const cl = clip.offsetLeft, ct = clip.offsetTop;
-        const band = W * BAND;
+        const band = W * parseFloat(getComputedStyle(dev).getPropertyValue('--band') || '0.012');
         const hasHome = !!dev.querySelector('.home');
 
         // 2) 검은 유리 베젤 — 금속 밴드와 화면 사이 중간 지점 (홈버튼 세대는 앞면이 유리 링이 아니라 제외)
@@ -144,7 +143,7 @@ export async function checkFrame(page, png, { allowCrop = false } = {}) {
           }
           const pc = pixel(on(dev, p)), oc = pixel(off(o));
           if (pc && oc && dist(pc, oc) < BUTTON_MIN) {
-            const name = [...btn.classList].find((c) => c.startsWith('btn-'))?.slice(4) ?? 'button';
+            const name = btn.dataset.name ?? 'button';
             fail('button-invisible', { name, dist: dist(pc, oc), min: BUTTON_MIN });
           }
         }
@@ -184,7 +183,7 @@ export async function checkFrame(page, png, { allowCrop = false } = {}) {
 
       return failures;
     },
-    { b64, allowCrop, BAND, CROP_TOLERANCE, BLEND_MIN, BUTTON_MIN, MIN_BUTTON_DEPTH_PX },
+    { b64, allowCrop, CROP_TOLERANCE, BLEND_MIN, BUTTON_MIN, MIN_BUTTON_DEPTH_PX },
   );
 }
 
