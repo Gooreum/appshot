@@ -5,6 +5,7 @@ import { getDevice } from './devices.js';
 import { getLayout } from './layouts.js';
 import { buildHTML } from './html.js';
 import { checkAll, checkCopyArea, sizeFromBuffer, validateImage } from './quality.js';
+import { checkFrame, FrameGateError } from './frame-gate.js';
 
 const MIME = {
   '.png': 'image/png',
@@ -26,7 +27,7 @@ const PREVIEW_SCALE = 0.34;
  * deviceScaleFactor를 지정하지 않으면 환경에 따라 2배 크기로 나오는데,
  * 이것이 스토어 스크린샷 리젝의 가장 흔한 원인이다.
  */
-export async function renderAll(cfg, { preview = false, only = null, placeholder = false, cwd = process.cwd(), onProgress, onWarnings } = {}) {
+export async function renderAll(cfg, { preview = false, only = null, placeholder = false, allowCrop = false, cwd = process.cwd(), onProgress, onWarnings } = {}) {
   const device = getDevice(cfg.device);
 
   // 품질 점검은 렌더를 막지 않는다 — 의도적으로 규칙을 깨는 디자인도 있고,
@@ -101,6 +102,7 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
 
   const browser = await chromium.launch();
   const results = [];
+  const gateFailed = [];
 
   try {
     const page = await browser.newPage({
@@ -122,12 +124,26 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
 
       await page.setContent(html, { waitUntil: 'load' });
       await page.evaluate(() => document.fonts.ready); // FOUT 상태로 캡처되는 것 방지
+      if (!(allowCrop || cfg.theme.allowDeviceCrop === true)) await fitDevices(page);
+      await hideBakedNotch(page);
 
       const area = checkCopyArea(cfg, index, await copyAreaRatio(page));
       if (area) warnings.push(area);
 
       const file = path.join(outDir, `${String(index + 1).padStart(2, '0')}.png`);
-      await page.screenshot({ path: file, type: 'png' });
+      const png = await page.screenshot({ type: 'png' });
+
+      // 프레임 게이트 — 기기처럼 보이지 않으면 저장하지 않는다. 이전 렌더의 같은 이름 파일도 지운다:
+      // 남겨 두면 "이번 렌더가 실패했다"는 사실과 무관하게 옛 파일이 그대로 제출될 수 있다.
+      if (usesDeviceMockup(screen)) {
+        const failures = await checkFrame(page, png, { allowCrop: allowCrop || cfg.theme.allowDeviceCrop === true });
+        if (failures.length) {
+          gateFailed.push({ index: index + 1, failures });
+          fs.rmSync(file, { force: true });
+          continue;
+        }
+      }
+      fs.writeFileSync(file, png);
 
       const stat = fs.statSync(file);
       const result = { file, index: index + 1, layout: screen.layout, bytes: stat.size, canvas };
@@ -139,7 +155,89 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
   }
 
   if (warnings.length) onWarnings?.(warnings);
+  if (gateFailed.length) throw new FrameGateError(gateFailed);
   return { results, outDir, canvas, device, preview, warnings };
+}
+
+/**
+ * 기기가 캔버스 밖으로 넘치면 넘치지 않을 만큼 줄인다.
+ *
+ * 레이아웃 치수(layouts.js의 deviceHeight)는 캔버스 높이 비율이라, 카피 높이와 기기별 화면 비율에
+ * 따라 넘치는 양이 2~15%로 제각각이었다 — 고정 값 하나로는 모든 기기에서 맞출 수 없다.
+ * 그래서 실제로 배치된 결과를 재서 .device-area를 scale한다. 넘친 쪽의 반대편을 기준점으로 삼아
+ * (caption-top이면 위쪽) 카피와의 간격은 그대로 두고 아래만 들어오게 한다.
+ * 잘린 구성이 의도라면 theme.allowDeviceCrop / --allow-crop으로 이 단계를 건너뛴다.
+ */
+function fitDevices(page) {
+  return page.evaluate(() => {
+    const margin = Math.round(innerHeight * 0.03);
+    for (const area of document.querySelectorAll('.device-area')) {
+      const devs = [...area.querySelectorAll('.device')];
+      if (!devs.length) continue;
+      const rs = devs.map((d) => d.getBoundingClientRect());
+      const box = {
+        top: Math.min(...rs.map((r) => r.top)), bottom: Math.max(...rs.map((r) => r.bottom)),
+        left: Math.min(...rs.map((r) => r.left)), right: Math.max(...rs.map((r) => r.right)),
+      };
+      const over = {
+        top: box.top < margin, bottom: box.bottom > innerHeight - margin,
+        left: box.left < margin, right: box.right > innerWidth - margin,
+      };
+      if (!over.top && !over.bottom && !over.left && !over.right) continue;
+
+      // 세로 기준점: 아래만 넘치면 위, 위만 넘치면 아래, 둘 다면 가운데
+      const oy = over.bottom && !over.top ? box.top : over.top && !over.bottom ? box.bottom : (box.top + box.bottom) / 2;
+      const ox = (box.left + box.right) / 2;
+      const scales = [1];
+      if (box.bottom > oy) scales.push((innerHeight - margin - oy) / (box.bottom - oy));
+      if (box.top < oy) scales.push((oy - margin) / (oy - box.top));
+      scales.push((ox - margin) / (ox - box.left), (innerWidth - margin - ox) / (box.right - ox));
+      const s = Math.min(...scales);
+      if (s >= 1) continue;
+      const a = area.getBoundingClientRect();
+      area.style.transformOrigin = `${ox - a.left}px ${oy - a.top}px`;
+      area.style.transform = `scale(${s})`;
+    }
+  });
+}
+
+/** 이 장에 기기(또는 창·카드) 목업이 들어가는가. fullbleed는 목업 없이 화면을 깔기만 한다. */
+function usesDeviceMockup(screen) {
+  return screen.layout !== 'fullbleed';
+}
+
+/**
+ * 소스에 이미 Dynamic Island가 찍혀 있으면 프레임이 그리는 섬(.notch)을 숨긴다.
+ *
+ * Xcode 26의 `simctl io screenshot`은 섬 자리를 검게 칠한 채 저장한다. 프레임이 섬을
+ * 또 그리면 위치가 몇 px 어긋나 섬이 두 겹으로 보인다 (iPhone 17 Pro Max에서 실제로 발생).
+ * 화면 상단 중앙 띠가 대부분 검으면 섬이 박혀 있다고 본다. 다크 UI라 상단이 원래 검은
+ * 경우에도 숨기지만, 그때는 검은 섬이 어차피 보이지 않으므로 결과가 같다.
+ */
+function hideBakedNotch(page) {
+  return page.evaluate(() => {
+    for (const clip of document.querySelectorAll('.screen-clip')) {
+      const notch = clip.querySelector('.notch');
+      const img = clip.querySelector('img.screen');
+      if (!notch || !img || getComputedStyle(notch).display === 'none' || !img.naturalWidth) continue;
+      const w = img.naturalWidth, h = img.naturalHeight;
+      const c = document.createElement('canvas');
+      const bw = Math.round(w * 0.06), bh = Math.round(h * 0.015);
+      c.width = bw; c.height = bh;
+      const ctx = c.getContext('2d');
+      // 섬 중심 부근(상단 2.5~4.0%, 가로 중앙 6%)만 잘라 본다.
+      // 실측(17 Pro Max, 1320×2868): 섬은 세로 1.5~5.3% — 위쪽 끝에 맞추면 상태바 배경이 섞여 놓친다
+      ctx.drawImage(img, (w - bw) / 2, h * 0.025, bw, bh, 0, 0, bw, bh);
+      let data;
+      try { data = ctx.getImageData(0, 0, bw, bh).data; } catch { continue; } // 교차 출처면 건너뜀
+      let dark = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        // 투명 픽셀(0,0,0,0)은 검정이 아니다 — SVG 자리표시자는 이 경로로 샘플이 비어 나온다
+        if (data[i + 3] > 200 && data[i] < 24 && data[i + 1] < 24 && data[i + 2] < 24) dark++;
+      }
+      if (dark / (data.length / 4) > 0.8) notch.style.display = 'none';
+    }
+  });
 }
 
 /**

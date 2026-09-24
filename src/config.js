@@ -152,6 +152,9 @@ export function validateConfig(cfg) {
     }
     if (!t.headline || typeof t.headline !== 'object') push('theme.headline이 없습니다.');
     if (!t.subhead || typeof t.subhead !== 'object') push('theme.subhead가 없습니다.');
+    if (t.allowDeviceCrop !== undefined && typeof t.allowDeviceCrop !== 'boolean') {
+      push('theme.allowDeviceCrop은 true/false여야 합니다.');
+    }
     if (t.deviceFrame !== undefined && typeof t.deviceFrame !== 'boolean') {
       push('theme.deviceFrame은 true/false여야 합니다.');
     }

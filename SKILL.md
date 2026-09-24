@@ -177,6 +177,25 @@ node ~/.claude/skills/appshot/bin/appshot.mjs render
 **결과물을 Read 도구로 직접 열어 눈으로 확인한다.** 규격이 맞는 것과
 보기 좋은 것은 다른 문제다. 큰 PNG는 `sips -Z 900`으로 축소본을 만들어 본다.
 
+### 프레임 게이트 (렌더를 막는 검사)
+
+`deviceFrame: true`는 "프레임을 그려라"는 스위치일 뿐이라, 예전에는 결과가 기기처럼 안 보여도
+그대로 통과했다. 이제 render가 PNG를 저장하기 **전에** 픽셀을 측정해서, 하나라도 실패하면
+그 장을 저장하지 않고(이전 렌더의 같은 이름 파일도 지운다) 에러로 중단한다.
+
+| 검사 | 실패 조건 |
+|---|---|
+| `device-crop` | 기기·창·카드가 캔버스 밖으로 1% 넘게 잘림 |
+| `no-glass-bezel` | 화면 둘레에 검은 유리 베젤이 없음 (금속 테두리만 있는 카드) |
+| `frame-blends` | 기기 테두리와 배경의 색 차이가 너무 작음 |
+| `button-invisible` | 측면 버튼이 배경에 묻힘 |
+| `double-island` | Dynamic Island가 두 겹 (캡처에 박힌 섬 + 프레임이 그린 섬) |
+
+- 기기는 기본적으로 **캔버스 안에 자동으로 맞춰진다** — 넘치면 render가 줄인다. 그래서 caption-top도 기기 전체가 보인다
+- 하단이 잘린 연출을 원하면 `theme.allowDeviceCrop: true` 또는 `render --allow-crop`. 이때만 잘림이 허용된다
+- 시뮬레이터 캡처에 박힌 섬은 render가 감지해서 프레임 쪽 섬을 숨긴다
+- 게이트 실패 메시지는 **사용자에게 그대로 전달**하고, 원인(배경색·소재·레이아웃)을 고쳐 다시 렌더한다. 게이트를 우회하려고 `deviceFrame: false`로 바꾸지 않는다
+
 렌더가 끝나면 품질 경고가 한 블록으로 출력된다. 사용자에게 전달하고 고칠지 묻는다.
 경고는 렌더를 막지 않는다.
 
@@ -201,7 +220,7 @@ init       appshot.config.json + screens/ 생성   [--platform] [--device] [--fo
 devices    디바이스와 스토어 규격 목록            [--platform] [--json]
 layouts    레이아웃 5종 설명                     [--json]
 capture    시뮬레이터/기기/맥 창에서 화면 캡처     --platform ios|macos|android [--name]
-render     스토어 스크린샷 생성                  [--only 1,3] [--preview] [--placeholder]
+render     스토어 스크린샷 생성                  [--only 1,3] [--preview] [--placeholder] [--allow-crop]
 ```
 
 ## 참고 문서

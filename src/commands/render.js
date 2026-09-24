@@ -16,6 +16,7 @@ export async function run({ opts }) {
     preview,
     only,
     placeholder: Boolean(opts.placeholder),
+    allowCrop: Boolean(opts['allow-crop']),
     cwd,
     onWarnings: printWarnings,
     onProgress: (r) => {

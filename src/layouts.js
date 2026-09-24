@@ -34,7 +34,7 @@ import { isLandscape } from './devices.js';
 export const LAYOUTS = {
   'caption-top': {
     label: '상단 카피 + 하단 디바이스',
-    desc: '카피를 먼저 읽히고 디바이스는 하단에서 잘린다. 스토어 목록 썸네일에서도 문구가 살아남는 가장 안전한 구성.',
+    desc: '카피를 먼저 읽히고 디바이스는 그 아래에 둔다. 넘치면 render가 캔버스에 맞춰 줄인다(--allow-crop이면 하단에서 잘린다). 스토어 목록 썸네일에서도 문구가 살아남는 가장 안전한 구성.',
     template: 'layout-caption-top.html',
     deviceHeight: 0.95,
     minWidth: 0.60,
