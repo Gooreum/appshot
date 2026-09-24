@@ -10,6 +10,10 @@
  * 여기서 W(픽셀)를 곱해 실제 치수로 바꾼다.
  */
 
+/** 금속 밴드 두께 (프레임 폭 대비). 나머지 베젤은 검은 유리(GLASS)로 칠한다. */
+const BAND = 0.007;
+const GLASS = '#050507';
+
 const MATERIALS = {
   titanium:
     'linear-gradient(145deg,#9A9AA0 0%,#3A3A3C 38%,#7C7C82 52%,#2C2C2E 68%,#6E6E73 100%)',
@@ -38,6 +42,8 @@ export function frameCSS(device, W) {
   padding: ${px(padTop)} ${px(bezel)} ${px(padBottom)};
   border-radius: ${px(W * f.radius)};
   background: ${material};
+  /* 버튼은 반투명 그라디언트였을 때 배경색에 묻혀 사실상 보이지 않았다 — 본체와 같은 불투명 소재로 */
+  --btn-material: ${material};
   ${shadowCSS(W)}
 }
 
@@ -52,12 +58,19 @@ export function frameCSS(device, W) {
   pointer-events: none;
 }
 
+/*
+ * 검은 유리 베젤. 패딩(bezel) 전체를 금속으로 칠하면 "회색 테두리 두른 카드"로 보이고
+ * 기기로 읽히지 않는다 — 실물은 얇은 금속 밴드 안쪽이 검은 유리다.
+ * overflow: hidden은 자기 box-shadow를 자르지 않으므로 spread로 화면 둘레에 링을 두른다.
+ * 홈버튼 세대(chin)는 위아래 유리 폭이 달라 균일한 링으로 표현할 수 없어 제외한다.
+ */
 .screen-clip {
   position: relative;
   overflow: hidden;
   border-radius: ${px(W * f.innerRadius)};
   line-height: 0;
   background: #000;
+  ${chin ? '' : `box-shadow: 0 0 0 ${px(Math.max(0, bezel - W * BAND))} ${GLASS};`}
 }
 
 .screen {
@@ -162,7 +175,7 @@ function homeCSS(chin, W) {
 function buttonsCSS(buttons, W, radius) {
   if (!buttons?.length) return '\n.btn { display: none; }';
 
-  const depth = W * 0.0055;
+  const depth = W * 0.0075;
   const geom = {
     'power-right': { side: 'right', top: 0.255, len: 0.105 },
     'volume-right': { side: 'right', top: 0.150, len: 0.070 },
@@ -185,7 +198,7 @@ function buttonsCSS(buttons, W, radius) {
   width: ${px(W * g.len)};
   height: ${px(depth * 2)};
   border-radius: ${px(depth)} ${px(depth)} 0 0;
-  background: linear-gradient(180deg, rgba(0,0,0,.35), rgba(255,255,255,.10));
+  background: var(--btn-material);
   z-index: -1;
 }`;
       }
@@ -197,7 +210,7 @@ function buttonsCSS(buttons, W, radius) {
   width: ${px(depth * 2)};
   height: ${px(W * g.len)};
   border-radius: ${isLeft ? `${px(depth)} 0 0 ${px(depth)}` : `0 ${px(depth)} ${px(depth)} 0`};
-  background: linear-gradient(${isLeft ? '270deg' : '90deg'}, rgba(0,0,0,.35), rgba(255,255,255,.10));
+  background: var(--btn-material);
   z-index: -1;
 }`;
     })
@@ -375,4 +388,4 @@ export function frameHTML(device, screenImgTag) {
 /** 소수점 3자리로 자른 px 문자열. 서브픽셀 값이 CSS에 그대로 흘러가지 않게. */
 const px = (n) => `${Math.round(n * 1000) / 1000}px`;
 
-export { MATERIALS };
+export { MATERIALS, BAND };
