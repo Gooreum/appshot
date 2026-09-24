@@ -20,9 +20,41 @@ node ~/.claude/skills/appshot/bin/appshot.mjs <command>
 
 ## 워크플로우
 
-사용자가 스크린샷을 요청하면 아래 5단계를 따른다.
+사용자가 스크린샷을 요청하면 아래 단계를 따른다.
 **추측하지 말고 AskUserQuestion으로 물어본다** — 플랫폼·디바이스·레이아웃은
 사용자가 골라야 하는 것이지 기본값으로 때울 것이 아니다.
+
+### 사용자 결정은 전부 AskUserQuestion으로 받는다
+
+사용자의 판단이 필요한 지점에서 **질문을 평문으로 쓰고 턴을 끝내지 않는다.** 평문으로 물으면
+사용자가 답을 처음부터 타이핑해야 한다. 반드시 AskUserQuestion으로 선택지를 준다.
+
+- 선택지는 2~4개. 추천안이 있으면 **첫 번째**에 두고 라벨 끝에 `(Recommended)`를 붙인다
+- **"기타"·"직접 입력" 선택지를 따로 만들지 않는다.** 도구가 자유 입력칸(Type something)을 자동으로 붙인다.
+  사용자가 자유 입력으로 답하면 그 내용을 그대로 반영한다
+- 카피 세트, 레이아웃, 색처럼 **눈으로 비교해야 하는 것은 `preview` 필드**에 실제 내용을 넣는다
+  (카피 전체 표, 레이아웃 ASCII, 색 hex). 라벨만 보고는 고를 수 없다
+- **"이대로 진행할까요?" 같은 예/아니오 확인 질문은 금지.** 다음 행동 자체를 선택지로 만든다
+  (예: "원본 렌더" / "카피 수정" / "색 수정")
+- 서로 의존하지 않는 질문은 한 번의 호출에 묶는다 (최대 4개). 앞 답에 따라 선택지가 바뀌는 질문은 나눈다
+- 질문이 아닌 안내("찍을 창을 클릭하세요")는 평문으로 쓴다
+
+결정 지점 목록 — 아래 단계 본문에서 `[D1]`처럼 참조한다:
+
+| ID | 시점 | 선택지 예시 |
+|---|---|---|
+| D1 | 플랫폼 | Apple / Mac / Android (여럿이면 multiSelect) |
+| D2 | 디바이스 | `[필수]` 슬롯 우선. iPhone + iPad처럼 여럿이면 multiSelect |
+| D3 | 기기 프레임 (Android·Mac만) | 끔 (Recommended, 스토어 권장) / 켬 |
+| D4 | 앱 화면 확보 | 가진 PNG 사용 / 시뮬레이터 자동 캡처 / 자리표시자로 먼저 |
+| D5 | 레이아웃 | 섞어서 (Recommended) / caption-top 통일 / angled 위주 — preview에 ASCII |
+| D6 | 카피 | 제안 A / 제안 B — preview에 장별 헤드라인·서브카피 표. 수정은 자유 입력으로 |
+| D7 | 배경 | 그라디언트 색 후보 2~3개 (preview에 hex) / 가진 배경 이미지 사용 |
+| D8 | 프리뷰 확인 후 | 원본 렌더 (Recommended) / 카피 수정 / 레이아웃·순서 수정 / 색·배경 수정 |
+| D9 | 품질 경고 | 고칠 경고를 multiSelect. 전부 무시도 선택지로 |
+| D10 | 게이트 실패 | 실패 원인별 수정안 (레이아웃 변경 / 배경색 변경 / 잘림 허용 등) |
+
+사용자가 요청에서 이미 답을 준 지점(예: "아이폰만", "카피는 이걸로")은 묻지 않고 건너뛴다.
 
 ### 1단계 — 환경 점검
 
@@ -37,8 +69,8 @@ cd ~/.claude/skills/appshot && npx playwright install chromium
 
 ### 2단계 — 플랫폼 선택
 
-AskUserQuestion으로 묻는다: **Apple (App Store)** / **Mac (Mac App Store)** /
-**Android (Google Play)** / 여럿.
+**[D1]** AskUserQuestion으로 묻는다: **Apple (App Store)** / **Mac (Mac App Store)** /
+**Android (Google Play)**. 여럿을 고를 수 있게 multiSelect로 묻는다.
 
 여럿이면 플랫폼별로 config를 나눠 여러 번 렌더한다 (규격이 다르므로).
 
@@ -59,7 +91,8 @@ node ~/.claude/skills/appshot/bin/appshot.mjs init --platform macos
 node ~/.claude/skills/appshot/bin/appshot.mjs devices --platform ios
 ```
 
-출력에서 `[필수]` 표시가 있는 슬롯을 우선 안내하고, AskUserQuestion으로 고르게 한다.
+**[D2]** 출력에서 `[필수]` 슬롯을 첫 선택지(Recommended)로 두고 AskUserQuestion으로 고르게 한다.
+iPad에서도 도는 앱이면 iPhone과 iPad를 함께 고를 수 있게 multiSelect로 묻는다.
 
 - App Store는 **iPhone 6.9" 또는 6.5" 중 하나**가 필수 — 기본은 6.9"(1290×2796).
   iPad에서 도는 앱이면 **iPad 13"(2064×2752)** 도 필수
@@ -71,15 +104,18 @@ node ~/.claude/skills/appshot/bin/appshot.mjs devices --platform ios
 
 **Android는 기본으로 기기 프레임 없이 앱 화면만 둥근 카드로 보여준다** (`theme.deviceFrame: false`).
 Google Play가 "기기 이미지는 금방 구식이 되고 일부 사용자를 소외시킨다"며 피하라고 권장하기 때문이다.
-사용자가 원하면 `true`로 켤 수 있지만 경고가 뜬다는 것을 알려준다. App Store는 프레임이 허용되므로 iOS 기본은 `true`.
+**[D3]** "끔 (Recommended)" / "켬 — Play가 권장하지 않아 경고가 뜬다"로 AskUserQuestion. App Store는 프레임이 허용되므로
+iOS 기본은 `true`이고 묻지 않는다.
 
 **macOS도 기본은 프레임 없음이다** (`theme.deviceFrame: false`). Mac 스크린샷에 넣는 것은
 바탕화면이 아니라 앱 **창**이고, 창을 노트북 베젤 안에 넣으면 바탕화면이 없어 어색해진다.
 MacBook 목업은 Mac App Store에서 **필수가 아니다** — 앱 창만 올리는 Mac 앱이 많다.
+Mac도 **[D3]**으로 창 목업을 쓸지 묻는다.
 
 ### 4단계 — 앱 화면 확보
 
-두 가지 방법이 있다. 사용자에게 어느 쪽인지 묻는다.
+**[D4]** AskUserQuestion으로 고르게 한다: "가진 PNG 사용" / "시뮬레이터 자동 캡처" / "자리표시자로 먼저".
+기존 캡처 폴더가 프로젝트에 보이면 그 경로와 장수를 선택지 설명에 적는다.
 
 **(a) 사용자가 PNG를 제공** — `screens/` 폴더에 넣게 안내한다.
 
@@ -87,7 +123,8 @@ MacBook 목업은 Mac App Store에서 **필수가 아니다** — 앱 창만 올
 ```bash
 node ~/.claude/skills/appshot/bin/appshot.mjs capture --platform ios
 ```
-adb가 없으면 실패가 아니라 "PNG를 직접 넣으세요" 안내가 나온다. 그때는 (a)로 유도한다.
+adb가 없으면 실패가 아니라 "PNG를 직접 넣으세요" 안내가 나온다. 그때는 **[D4]**를 다시 묻되
+자동 캡처를 빼고 (a)와 자리표시자만 선택지로 준다.
 
 **맥은 창을 클릭해 찍는다:**
 ```bash
@@ -118,7 +155,8 @@ node ~/.claude/skills/appshot/bin/appshot.mjs init --device <id>
 node ~/.claude/skills/appshot/bin/appshot.mjs layouts
 ```
 
-`layouts`가 5종을 ASCII 미리보기와 함께 출력한다. AskUserQuestion으로 고르게 한다.
+`layouts`가 5종을 ASCII 미리보기와 함께 출력한다. **[D5]** AskUserQuestion으로 고르게 하고,
+각 선택지의 `preview`에 그 구성의 ASCII를 넣는다.
 **스크린마다 다른 레이아웃을 섞으라고 권한다** — 5장이 전부 같은 구성이면
 스토어에서 옆으로 넘길 때 단조롭다.
 
@@ -130,7 +168,10 @@ node ~/.claude/skills/appshot/bin/appshot.mjs layouts
 | `fullbleed` | 앱 UI 자체가 예쁠 때 |
 | `duo` | 두 화면의 흐름을 한 장에 (source2 필요) |
 
-카피는 앱 화면을 **직접 읽고** 제안한다. 사용자가 이미 문구를 줬으면 그대로 쓴다.
+카피는 앱 화면을 **직접 읽고** 제안한다. 사용자가 이미 문구를 줬으면 그대로 쓰고 묻지 않는다.
+**[D6]** 제안은 표로 출력하고 끝내지 않는다. 방향이 다른 카피 세트 2개(예: 결과 중심 / 기능 중심)를
+AskUserQuestion 선택지로 주고, 각 `preview`에 장별 헤드라인·서브카피 전체를 넣는다. 한 줄만 고치고 싶은
+사용자는 자유 입력칸에 수정 내용을 적는다.
 작성 원칙은 `references/copywriting.md`를 참고한다. 핵심만:
 
 - 기능이 아니라 **결과**를 쓴다 ("동기화 지원" ✗ → "어디서든 이어보기" ✓)
@@ -159,11 +200,14 @@ node ~/.claude/skills/appshot/bin/appshot.mjs layouts
 
 - 경로는 **대상 프로젝트 기준**이다. 깨진·없는 배경 파일은 앱 화면과 똑같이 렌더 전에 거부된다
 - `overlay`는 배경 위 가독성 마스크로 **기본 0.28**이다. 배경 사진은 부분마다 밝기가 달라 대비를
-  자동 검사할 수 없어서 기본으로 씌운다. 이미 어두운 배경이면 `0`으로 끄라고 안내한다
+  자동 검사할 수 없어서 기본으로 씌운다. 이미 어두운 배경이면 `0`으로 끈다
 - `fit: cover`는 가장자리를 자르고, `contain`은 다 보이는 대신 여백이 남는다.
   비율이 캔버스와 20% 넘게 다르면 `bg-crop` 경고가 뜬다
 - **appshot은 배경 이미지를 만들어 주지 않는다.** 사용자가 파일을 주지 않으면 그라디언트를 쓰거나,
   이미지를 따로 만들어 `backgrounds/`에 넣도록 안내한다
+
+**[D7]** 배경은 앱의 주 색에서 뽑은 그라디언트 후보 2~3개(각 `preview`에 from/to hex와 각도)와
+"가진 배경 이미지 사용"을 선택지로 준다.
 
 ### 6단계 — 렌더
 
@@ -176,6 +220,9 @@ node ~/.claude/skills/appshot/bin/appshot.mjs render
 
 **결과물을 Read 도구로 직접 열어 눈으로 확인한다.** 규격이 맞는 것과
 보기 좋은 것은 다른 문제다. 큰 PNG는 `sips -Z 900`으로 축소본을 만들어 본다.
+
+**[D8]** 프리뷰를 보여준 뒤 "원본 렌더 (Recommended)" / "카피 수정" / "레이아웃·순서 수정" / "색·배경 수정"을
+AskUserQuestion으로 묻는다. 수정을 고르면 해당 결정 지점(D5·D6·D7)으로 돌아간다.
 
 ### 프레임 게이트 (렌더를 막는 검사)
 
@@ -194,10 +241,13 @@ node ~/.claude/skills/appshot/bin/appshot.mjs render
 - 기기는 기본적으로 **캔버스 안에 자동으로 맞춰진다** — 넘치면 render가 줄인다. 그래서 caption-top도 기기 전체가 보인다
 - 하단이 잘린 연출을 원하면 `theme.allowDeviceCrop: true` 또는 `render --allow-crop`. 이때만 잘림이 허용된다
 - 시뮬레이터 캡처에 박힌 섬은 render가 감지해서 프레임 쪽 섬을 숨긴다
-- 게이트 실패 메시지는 **사용자에게 그대로 전달**하고, 원인(배경색·소재·레이아웃)을 고쳐 다시 렌더한다. 게이트를 우회하려고 `deviceFrame: false`로 바꾸지 않는다
+- 게이트 실패 메시지는 **사용자에게 그대로 전달**하고, **[D10]** 실패 원인별 수정안을 AskUserQuestion으로 준다
+  (`device-crop` → 다른 레이아웃 / 잘림 허용, `frame-blends`·`button-invisible` → 배경색 변경 후보). 게이트를 우회하려고
+  `deviceFrame: false`로 바꾸지 않는다
 
-렌더가 끝나면 품질 경고가 한 블록으로 출력된다. 사용자에게 전달하고 고칠지 묻는다.
-경고는 렌더를 막지 않는다.
+렌더가 끝나면 품질 경고가 한 블록으로 출력된다. 경고는 렌더를 막지 않는다.
+**[D9]** 경고를 전달한 뒤 고칠 항목을 AskUserQuestion multiSelect로 고르게 한다. 선택지는 경고마다
+하나씩(최대 4개, 많으면 종류별로 묶는다)이고 "그대로 둔다"도 넣는다.
 
 | 경고 | 근거 |
 |---|---|
