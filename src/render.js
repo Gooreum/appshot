@@ -97,7 +97,9 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
   if (problems.size === 1) throw [...problems.values()][0].error; // 1개면 원래 문구 그대로
   if (problems.size > 1) throw new Error(imageProblemsMessage([...problems.values()]));
 
-  const outDir = path.resolve(cwd, cfg.output, cfg.locale, cfg.device);
+  // 프리뷰는 별도 디렉터리에 쓴다 — 같은 경로를 쓰면 제출용 원본이 저해상도 파일로 덮이거나
+  // 프레임 게이트 실패 시 지워진다.
+  const outDir = path.resolve(cwd, cfg.output, preview ? '_preview' : '', cfg.locale, cfg.device);
   fs.mkdirSync(outDir, { recursive: true });
 
   const browser = await chromium.launch();

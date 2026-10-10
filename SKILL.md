@@ -281,7 +281,8 @@ render     스토어 스크린샷 생성                  [--only 1,3] [--previe
 ## 주의
 
 - 출력은 `{output}/{locale}/{device}/01.png` 형식으로 쌓인다. 로케일이 여럿이면
-  `locale`을 바꿔가며 여러 번 렌더한다
+  `locale`을 바꿔가며 여러 번 렌더한다. `--preview`는 `{output}/_preview/{locale}/{device}/`에
+  따로 쌓이므로 제출할 때는 `_preview` 밖의 파일을 쓴다
 - `deviceScaleFactor: 1`로 고정되어 있어 출력 크기가 항상 규격과 1:1이다.
   이 값을 건드리면 2배 크기로 나와 스토어가 리젝한다
 - 폰트는 시스템 스택만 쓴다. 네트워크 폰트를 넣으면 렌더 결과가 재현되지 않는다

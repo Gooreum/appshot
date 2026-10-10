@@ -31,7 +31,8 @@ export async function run({ opts }) {
 
   if (preview) {
     console.log(`  프리뷰 해상도 ${spec} (제출 규격은 ${canvasLabel(device)})`);
-    console.log("  확인이 끝나면 'appshot render'로 제출용 원본을 뽑으세요.\n");
+    const submitDir = path.join(cfg.output, cfg.locale, cfg.device);
+    console.log(`  확인이 끝나면 'appshot render'로 제출용 원본을 뽑으세요 (${submitDir}).\n`);
   } else {
     console.log(`  제출 규격 ${spec} — ${device.storeSlot}\n`);
   }

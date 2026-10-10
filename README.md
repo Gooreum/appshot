@@ -215,7 +215,7 @@ Claude Code에서는 "앱스토어 스크린샷 만들어줘"라고 요청하면
 }
 ```
 
-- 로케일이 여럿이면 `locale`을 바꿔 여러 번 렌더한다. 출력은 `{output}/{locale}/{device}/`로 나뉜다
+- 로케일이 여럿이면 `locale`을 바꿔 여러 번 렌더한다. 출력은 `{output}/{locale}/{device}/`로 나뉜다. `--preview`는 제출용을 덮지 않도록 `{output}/_preview/{locale}/{device}/`에 따로 쓴다
 - 기기가 여럿(iPhone + iPad)이면 config를 기기별로 나눠 렌더한다. 규격과 레이아웃 치수가 다르기 때문이다
 
 ### 캡처
