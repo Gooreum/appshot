@@ -269,7 +269,7 @@ doctor     환경 점검 (playwright / chromium / simctl / screencapture / adb)
 init       appshot.config.json + screens/ 생성   [--platform] [--device] [--force]
 devices    디바이스와 스토어 규격 목록            [--platform] [--json]
 layouts    레이아웃 5종 설명                     [--json]
-capture    시뮬레이터/기기/맥 창에서 화면 캡처     --platform ios|macos|android [--name]
+capture    시뮬레이터/기기/맥 창에서 화면 캡처     --platform ios|macos|android [--name] [--force]
 render     스토어 스크린샷 생성                  [--only 1,3] [--preview] [--placeholder] [--allow-crop]
 ```
 

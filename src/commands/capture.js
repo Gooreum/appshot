@@ -20,9 +20,19 @@ export async function run({ opts }) {
   }
 
   const dir = path.join(cwd, 'screens');
-  const dest = opts.name
-    ? path.join(dir, opts.name.endsWith('.png') ? opts.name : `${opts.name}.png`)
+  // 경로 부분은 버린다 — 캡처는 screens/ 밖으로 나가지 않는다
+  const name = typeof opts.name === 'string' ? path.basename(opts.name.trim()) : null;
+  if (opts.name !== undefined && !name) {
+    console.error('--name에는 파일명을 지정하세요.');
+    return 1;
+  }
+  const dest = name
+    ? path.join(dir, name.endsWith('.png') ? name : `${name}.png`)
     : nextScreenPath(dir);
+  if (name && fs.existsSync(dest) && !opts.force) {
+    console.error(`이미 있습니다: ${path.relative(cwd, dest)} (--force로 덮어쓰기)`);
+    return 1;
+  }
   fs.mkdirSync(path.dirname(dest), { recursive: true });
 
   try {
