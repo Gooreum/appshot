@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from '../src/args.js';
 
 const COMMANDS = {
@@ -43,11 +44,13 @@ async function main() {
     return 1;
   }
 
+  const target = new URL(`../src/commands/${command}.js`, import.meta.url);
   let mod;
   try {
-    mod = await import(`../src/commands/${command}.js`);
+    mod = await import(target);
   } catch (err) {
-    if (err?.code === 'ERR_MODULE_NOT_FOUND') {
+    // 커맨드 파일 자체가 없을 때만 미구현. playwright 등 의존성 누락은 원래 오류를 그대로 던진다.
+    if (err?.code === 'ERR_MODULE_NOT_FOUND' && err.message.includes(fileURLToPath(target))) {
       console.error(`'${command}'는 아직 구현되지 않았습니다.`);
       console.error(`  ${COMMANDS[command].usage}`);
       return 1;
