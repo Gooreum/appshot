@@ -45,7 +45,7 @@ node ~/.claude/skills/appshot/bin/appshot.mjs <command>
 |---|---|---|
 | D1 | 플랫폼 | Apple / Mac / Android (여럿이면 multiSelect) |
 | D2 | 디바이스 | `[필수]` 슬롯 우선. iPhone + iPad처럼 여럿이면 multiSelect |
-| D3 | 기기 프레임 (Android·Mac만) | 끔 (Recommended, 스토어 권장) / 켬 |
+| D3 | 기기 프레임 (Android·Mac만) | Android: 끔 (Recommended, 스토어 권장) / 켬 · Mac: 창 목업 켬 (Recommended, 기본값) / 끔 |
 | D4 | 앱 화면 확보 | 가진 PNG 사용 / 시뮬레이터 자동 캡처 / 자리표시자로 먼저 |
 | D5 | 레이아웃 | 섞어서 (Recommended) / caption-top 통일 / angled 위주 — preview에 ASCII |
 | D6 | 카피 | 제안 A / 제안 B — preview에 장별 헤드라인·서브카피 표. 수정은 자유 입력으로 |
@@ -107,10 +107,11 @@ Google Play가 "기기 이미지는 금방 구식이 되고 일부 사용자를 
 **[D3]** "끔 (Recommended)" / "켬 — Play가 권장하지 않아 경고가 뜬다"로 AskUserQuestion. App Store는 프레임이 허용되므로
 iOS 기본은 `true`이고 묻지 않는다.
 
-**macOS도 기본은 프레임 없음이다** (`theme.deviceFrame: false`). Mac 스크린샷에 넣는 것은
-바탕화면이 아니라 앱 **창**이고, 창을 노트북 베젤 안에 넣으면 바탕화면이 없어 어색해진다.
+**macOS 기본은 앱 창 목업이다** (`theme.deviceFrame: true`) — 노트북 베젤이 아니라 신호등 버튼이 있는
+macOS 앱 **창**으로 감싼다. Mac 스크린샷에 넣는 것은 바탕화면이 아니라 앱 창이고,
+창을 노트북 베젤 안에 넣으면 바탕화면이 없어 어색해지기 때문이다. 화면만 보이려면 `false`.
 MacBook 목업은 Mac App Store에서 **필수가 아니다** — 앱 창만 올리는 Mac 앱이 많다.
-Mac도 **[D3]**으로 창 목업을 쓸지 묻는다.
+Mac도 **[D3]**으로 "창 목업 켬 (Recommended)" / "끔 — 화면만"을 묻는다.
 
 ### 4단계 — 앱 화면 확보
 
