@@ -103,17 +103,31 @@ export function validateConfig(cfg) {
     push(`platform이 올바르지 않습니다: '${cfg.platform}' (사용 가능: ${Object.keys(PLATFORMS).join(', ')})`);
   }
 
-  const device = DEVICES[cfg.device];
-  if (!device) {
-    push(`알 수 없는 device: '${cfg.device}' (사용 가능: ${Object.keys(DEVICES).join(', ')})`);
-  } else if (cfg.platform && device.platform !== cfg.platform) {
-    push(`device '${cfg.device}'는 ${device.platform} 기기인데 platform은 '${cfg.platform}'입니다.`);
+  // devices 배열이 있으면 device는 선택 항목이 되고(있으면 배열 안에 있어야 한다), 각 id를 검사한다
+  const devices = cfg.devices === undefined ? null : checkIdList(cfg.devices, 'devices', push);
+  if (devices) {
+    for (const id of devices) {
+      const d = DEVICES[id];
+      if (!d) push(`devices에 알 수 없는 기기가 있습니다: '${id}' (사용 가능: ${Object.keys(DEVICES).join(', ')})`);
+      else if (cfg.platform && d.platform !== cfg.platform) push(`devices의 '${id}'는 ${d.platform} 기기인데 platform은 '${cfg.platform}'입니다.`);
+    }
+    if (cfg.device !== undefined && !devices.includes(cfg.device)) push(`device '${cfg.device}'가 devices 배열에 없습니다.`);
+  } else {
+    const device = DEVICES[cfg.device];
+    if (!device) {
+      push(`알 수 없는 device: '${cfg.device}' (사용 가능: ${Object.keys(DEVICES).join(', ')})`);
+    } else if (cfg.platform && device.platform !== cfg.platform) {
+      push(`device '${cfg.device}'는 ${device.platform} 기기인데 platform은 '${cfg.platform}'입니다.`);
+    }
   }
 
   if (typeof cfg.output !== 'string' || !cfg.output.trim()) {
     push('output이 비어 있습니다. 예: "./store-screenshots"');
   }
-  if (typeof cfg.locale !== 'string' || !cfg.locale.trim()) {
+  const locales = cfg.locales === undefined ? null : checkIdList(cfg.locales, 'locales', push);
+  if (locales) {
+    if (cfg.locale !== undefined && !locales.includes(cfg.locale)) push(`locale '${cfg.locale}'이 locales 배열에 없습니다.`);
+  } else if (typeof cfg.locale !== 'string' || !cfg.locale.trim()) {
     push('locale이 비어 있습니다. 예: "ko"');
   }
 
@@ -137,8 +151,11 @@ export function validateConfig(cfg) {
       if (s.layout === 'duo' && (typeof s.source2 !== 'string' || !s.source2.trim())) {
         push(`${at}는 duo 레이아웃이므로 source2(두 번째 화면)도 필요합니다.`);
       }
-      if (typeof s.headline !== 'string') {
-        push(`${at}.headline이 문자열이 아닙니다.`);
+      if (!isCopy(s.headline)) {
+        push(`${at}.headline은 문자열이거나 로케일별 맵({ "ko": "...", "en": "..." })이어야 합니다.`);
+      }
+      if (s.subhead !== undefined && !isCopy(s.subhead)) {
+        push(`${at}.subhead는 문자열이거나 로케일별 맵이어야 합니다.`);
       }
     });
   }
@@ -173,6 +190,21 @@ export function validateConfig(cfg) {
 
   return errors;
 }
+
+/** 비어 있지 않은 문자열 배열, 중복 없음. 통과하면 배열을, 아니면 에러를 남기고 null을 돌려준다. */
+function checkIdList(v, name, push) {
+  if (!Array.isArray(v)) { push(`${name}는 문자열 배열이어야 합니다.`); return null; }
+  if (v.length === 0) { push(`${name}가 빈 배열입니다. 배열을 지우거나 값을 넣으세요.`); return null; }
+  if (v.some((x) => typeof x !== 'string' || !x.trim())) { push(`${name}에 빈 값이 있습니다.`); return null; }
+  if (new Set(v).size !== v.length) { push(`${name}에 중복 값이 있습니다: ${v.join(', ')}`); return null; }
+  return v;
+}
+
+/** 카피 값: 문자열, 또는 값이 전부 문자열인 로케일 맵 */
+const isCopy = (v) =>
+  typeof v === 'string' ||
+  (Boolean(v) && typeof v === 'object' && !Array.isArray(v) &&
+    Object.keys(v).length > 0 && Object.values(v).every((x) => typeof x === 'string'));
 
 /**
  * theme.fontFile 형태 검사 — 문자열(경로) 또는 { path, weight }[].
