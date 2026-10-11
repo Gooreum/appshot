@@ -3,7 +3,8 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { getDevice } from './devices.js';
 import { getLayout } from './layouts.js';
-import { buildHTML } from './html.js';
+import { buildHTML, BRAND_FONT_FAMILY } from './html.js';
+import { normalizeFontFiles } from './config.js';
 import { checkAll, checkCopyArea, sizeFromBuffer, validateImage } from './quality.js';
 import { checkFrame, FrameGateError } from './frame-gate.js';
 
@@ -12,6 +13,14 @@ const MIME = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
+};
+
+/** 폰트 확장자 → [data URI MIME, @font-face format()] */
+const FONT_FORMAT = {
+  '.ttf': ['font/ttf', 'truetype'],
+  '.otf': ['font/otf', 'opentype'],
+  '.woff': ['font/woff', 'woff'],
+  '.woff2': ['font/woff2', 'woff2'],
 };
 
 /** 프리뷰 축소 비율. 1/3 정도면 레이아웃과 카피 길이를 판단하기에 충분하다. */
@@ -94,6 +103,28 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
     }
   }
 
+  // 브랜드 폰트 — 장마다 같으므로 한 번만 읽는다.
+  // --placeholder에서 없는 파일은 배경 이미지와 같은 원칙으로 경고만 남기고 시스템 폰트로 떨어진다.
+  const fonts = [];
+  for (const entry of normalizeFontFiles(cfg.theme.fontFile)) {
+    const file = path.resolve(cwd, entry.path);
+    if (placeholder && !fs.existsSync(file)) {
+      warnings.push({
+        level: 'warn',
+        screen: null,
+        code: 'font-missing',
+        message: `브랜드 폰트가 없어 시스템 폰트로 렌더했습니다: ${entry.path}`,
+      });
+      continue;
+    }
+    try {
+      fonts.push(readFont(entry, cwd));
+    } catch (err) {
+      if (!(err instanceof ScreenImageError)) throw err;
+      problems.set(file, { error: err, screens: ['폰트'] });
+    }
+  }
+
   if (problems.size === 1) throw [...problems.values()][0].error; // 1개면 원래 문구 그대로
   if (problems.size > 1) throw new Error(imageProblemsMessage([...problems.values()]));
 
@@ -122,10 +153,12 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
         index,
         total: cfg.screens.length,
         images: { ...images, background },
+        fonts,
       });
 
       await page.setContent(html, { waitUntil: 'load' });
       await page.evaluate(() => document.fonts.ready); // FOUT 상태로 캡처되는 것 방지
+      if (fonts.length) await assertFontsLoaded(page, fonts);
       if (!(allowCrop || cfg.theme.allowDeviceCrop === true)) await fitDevices(page);
       await hideBakedNotch(page);
 
@@ -267,6 +300,48 @@ function copyAreaRatio(page) {
   });
 }
 
+/**
+ * 브랜드 폰트가 실제로 로드됐는지 확인한다.
+ * 깨진 파일이나 확장자만 바꾼 파일은 fonts.ready가 성공으로 끝나도 face 상태가 'error'다.
+ * data URI 폰트는 쓰이기 전까지 로드가 시작되지 않을 수 있어 load()를 직접 건다.
+ * 선언 순서가 보존되므로 인덱스로 어느 파일인지 알 수 있다.
+ */
+async function assertFontsLoaded(page, fonts) {
+  const failed = await page.evaluate(async (family) => {
+    const faces = [...document.fonts].filter((f) => f.family.replace(/["']/g, '') === family);
+    await Promise.all(faces.map((f) => f.load().catch(() => {})));
+    return faces.map((f, i) => (f.status === 'loaded' ? null : i)).filter((i) => i !== null);
+  }, BRAND_FONT_FAMILY);
+  if (failed.length) {
+    const sources = failed.map((i) => fonts[i]?.source ?? `#${i + 1}`).join(', ');
+    throw new Error(
+      `브랜드 폰트를 불러오지 못했습니다: ${sources} — 파일이 손상됐거나 확장자와 실제 형식이 다릅니다.`,
+    );
+  }
+}
+
+/** 폰트 파일을 data URI로 읽는다. 없거나 비어 있으면 이미지와 같은 ScreenImageError로 모은다. */
+function readFont(entry, cwd) {
+  const file = path.resolve(cwd, entry.path);
+  if (!fs.existsSync(file)) {
+    throw new ScreenImageError(
+      `브랜드 폰트를 찾을 수 없습니다: ${entry.path}\n` +
+        `  찾은 경로: ${file}\n` +
+        `  파일을 넣거나 theme.fontFile을 지우세요.`,
+      { source: entry.path, reason: '파일을 찾을 수 없습니다.', kind: 'missing' },
+    );
+  }
+  const buf = fs.readFileSync(file);
+  if (buf.length === 0) {
+    throw new ScreenImageError(
+      `브랜드 폰트를 읽을 수 없습니다: ${entry.path}\n  파일이 비어 있습니다 (0바이트).`,
+      { source: entry.path, reason: '파일이 비어 있습니다 (0바이트).', kind: 'broken' },
+    );
+  }
+  const [mime, format] = FONT_FORMAT[path.extname(file).toLowerCase()];
+  return { uri: `data:${mime};base64,${buf.toString('base64')}`, format, weight: entry.weight, source: entry.path };
+}
+
 /** 앱 화면 파일 문제. 여러 개를 모아 한 번에 보여주려고 파일·사유를 따로 싣는다. */
 class ScreenImageError extends Error {
   constructor(message, { source, reason, kind }) {
@@ -299,7 +374,7 @@ function imageProblemsMessage(problems) {
     ? "\n  없는 화면은 'appshot capture'로 캡처하거나 --placeholder로 자리표시자를 쓰세요."
     : '';
   return (
-    `앱 화면 ${problems.length}개에 문제가 있습니다:\n${lines.join('\n')}\n` +
+    `파일 ${problems.length}개에 문제가 있습니다:\n${lines.join('\n')}\n` +
     `  깨진 파일은 다시 만들거나 다른 화면을 지정하세요.${hint}`
   );
 }
