@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
-import { getDevice } from './devices.js';
+import { getDevice, PREVIEW_SCALE } from './devices.js';
 import { getLayout } from './layouts.js';
 import { buildHTML, BRAND_FONT_FAMILY } from './html.js';
 import { normalizeFontFiles } from './config.js';
@@ -23,9 +23,6 @@ const FONT_FORMAT = {
   '.woff': ['font/woff', 'woff'],
   '.woff2': ['font/woff2', 'woff2'],
 };
-
-/** 프리뷰 축소 비율. 1/3 정도면 레이아웃과 카피 길이를 판단하기에 충분하다. */
-const PREVIEW_SCALE = 0.34;
 
 /**
  * config를 읽어 스토어 스크린샷을 배치 생성한다.
