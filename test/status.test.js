@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { scanOutput, evaluate } from '../src/status.js';
+import { scanOutput, scanFeatureGraphics, evaluate } from '../src/status.js';
 import { defaultConfig } from '../src/config.js';
 
 /** PNG 시그니처 + IHDR만 있는 33바이트 가짜 PNG. sizeFromBuffer가 폭·높이를 읽는 데 충분하다. */
@@ -20,9 +20,13 @@ function fakePNG(w, h) {
 const IPHONE = [1290, 2796];
 const IPAD = [2064, 2752];
 const PIXEL = [1080, 1920];
+const FEATURE = [1024, 500];
 
-/** 임시 프로젝트. shots: { 'ko/iphone-17-pro-max': [[w,h], ...] }  (index = 배열 순서, null이면 빈 번호) */
-function project(cfg, shots, { files = {}, mtimeShift = 0 } = {}) {
+/**
+ * 임시 프로젝트. shots: { 'ko/iphone-17-pro-max': [[w,h], ...] }  (index = 배열 순서, null이면 빈 번호)
+ * featureGraphics: { ko: [w,h] } — {output}/{locale}/feature-graphic.png
+ */
+function project(cfg, shots, { files = {}, mtimeShift = 0, featureGraphics = {} } = {}) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'appshot-status-'));
   const t0 = Date.now() / 1000 - 1000; // 결과물 기준 시각(초)
   fs.writeFileSync(path.join(cwd, 'appshot.config.json'), JSON.stringify(cfg));
@@ -44,6 +48,12 @@ function project(cfg, shots, { files = {}, mtimeShift = 0 } = {}) {
       fs.utimesSync(f, t0 + mtimeShift, t0 + mtimeShift);
     });
   }
+  for (const [locale, wh] of Object.entries(featureGraphics)) {
+    const f = path.join(cwd, cfg.output, locale, 'feature-graphic.png');
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, fakePNG(...wh));
+    fs.utimesSync(f, t0 + mtimeShift, t0 + mtimeShift);
+  }
   for (const [rel, content] of Object.entries(files)) {
     const f = path.join(cwd, rel);
     fs.mkdirSync(path.dirname(f), { recursive: true });
@@ -52,7 +62,10 @@ function project(cfg, shots, { files = {}, mtimeShift = 0 } = {}) {
   return { cwd, t0 };
 }
 
-const run = (cwd, cfg, opts = {}) => evaluate(scanOutput(path.resolve(cwd, cfg.output)), cfg, { cwd, ...opts });
+const run = (cwd, cfg, opts = {}) => {
+  const outRoot = path.resolve(cwd, cfg.output);
+  return evaluate(scanOutput(outRoot), cfg, { cwd, featureGraphics: scanFeatureGraphics(outRoot), ...opts });
+};
 const codes = (r, level) => r.problems.filter((p) => !level || p.level === level).map((p) => p.code);
 const ios = () => defaultConfig({ platform: 'ios' });
 
@@ -124,7 +137,7 @@ test('Android: 폰 1장은 합계 미달, 3장은 추천 경고만, 9장은 coun
   cfg.screens = cfg.screens.slice(0, 3);
   const one = project(cfg, { 'ko/pixel-9-pro-xl': [PIXEL] });
   assert.ok(codes(run(one.cwd, cfg), 'error').includes('missing-required'));
-  const three = project(cfg, { 'ko/pixel-9-pro-xl': [PIXEL, PIXEL, PIXEL] });
+  const three = project(cfg, { 'ko/pixel-9-pro-xl': [PIXEL, PIXEL, PIXEL] }, { featureGraphics: { ko: FEATURE } });
   const r3 = run(three.cwd, cfg);
   assert.equal(r3.ok, true, JSON.stringify(r3.problems));
   assert.ok(codes(r3, 'warn').includes('count-recommend'));
@@ -164,4 +177,49 @@ test('다중 config: devices×locales 조합 중 없는 폴더는 locale-missing
   assert.deepEqual([lm[0].locale, lm[0].device], ['en', 'ipad-pro-13']);
   assert.ok(r.problems.some((x) => x.code === 'missing-required' && x.locale === 'en')); // config가 iPad를 대상으로 하므로 en에도 13" 필수
   assert.ok(!codes(r).includes('not-current'));
+});
+
+test('피처 그래픽: Android에서 없으면 missing-feature-graphic 에러, 1024×500이면 ok', () => {
+  const cfg = defaultConfig({ platform: 'android' });
+  const shots = { 'ko/pixel-9-pro-xl': [PIXEL, PIXEL, PIXEL, PIXEL] };
+  const none = run(project(cfg, shots).cwd, cfg);
+  assert.equal(none.ok, false);
+  const m = none.problems.filter((x) => x.code === 'missing-feature-graphic');
+  assert.equal(m.length, 1);
+  assert.deepEqual([m[0].level, m[0].locale, m[0].file], ['error', 'ko', 'feature-graphic.png']);
+  const row = none.rows.find((r) => r.device === 'feature-graphic');
+  assert.deepEqual([row.count, row.errors, row.canvas], [0, 1, '1024×500']);
+
+  const ok = run(project(cfg, shots, { featureGraphics: { ko: FEATURE } }).cwd, cfg);
+  assert.equal(ok.ok, true, JSON.stringify(ok.problems));
+  assert.equal(ok.rows.find((r) => r.device === 'feature-graphic').count, 1);
+});
+
+test('피처 그래픽: 프리뷰 크기는 preview-size, 다른 크기는 size-mismatch', () => {
+  const cfg = defaultConfig({ platform: 'android' });
+  const shots = { 'ko/pixel-9-pro-xl': [PIXEL, PIXEL, PIXEL, PIXEL] };
+  const preview = run(project(cfg, shots, { featureGraphics: { ko: [348, 170] } }).cwd, cfg);
+  assert.deepEqual(codes(preview, 'error'), ['preview-size']);
+  const wrong = run(project(cfg, shots, { featureGraphics: { ko: [1000, 500] } }).cwd, cfg);
+  assert.deepEqual(codes(wrong, 'error'), ['size-mismatch']);
+  assert.match(wrong.problems[0].message, /1024×500/);
+});
+
+test('피처 그래픽: source가 결과보다 새로우면 stale, 현재 config가 아닌 로케일은 판정하지 않는다', () => {
+  const cfg = defaultConfig({ platform: 'android' });
+  const shots = { 'ko/pixel-9-pro-xl': [PIXEL, PIXEL, PIXEL, PIXEL], 'en/pixel-9-pro-xl': [PIXEL, PIXEL, PIXEL, PIXEL] };
+  const { cwd, t0 } = project(cfg, shots, { featureGraphics: { ko: FEATURE, en: FEATURE } });
+  fs.utimesSync(path.join(cwd, cfg.featureGraphic.source), t0 + 10, t0 + 10);
+  const r = run(cwd, cfg);
+  const stale = r.problems.filter((x) => x.code === 'stale');
+  assert.equal(stale.length, 2); // ko의 01.png와 feature-graphic.png
+  assert.ok(stale.some((x) => x.file === 'feature-graphic.png' && x.locale === 'ko'));
+  assert.ok(!r.problems.some((x) => x.locale === 'en' && x.file === 'feature-graphic.png'));
+});
+
+test('피처 그래픽: iOS는 판정하지 않는다', () => {
+  const cfg = ios();
+  const r = run(project(cfg, { 'ko/iphone-17-pro-max': [IPHONE, IPHONE, IPHONE] }).cwd, cfg);
+  assert.equal(r.ok, true, JSON.stringify(r.problems));
+  assert.ok(!r.rows.some((x) => x.device === 'feature-graphic'));
 });

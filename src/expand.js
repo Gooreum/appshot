@@ -23,13 +23,14 @@ export function defaultCombo(cfg) {
  * 한 조합의 단일 config와 펼치기 경고를 돌려준다.
  * - 카피 맵은 해당 로케일 문자열로 확정한다. 번역이 없으면 locales 순서 → 첫 키 순으로 대체하고
  *   copy-missing 경고를 남긴다 (품질 점검은 렌더를 막지 않는다는 원칙).
- * - source / source2 / theme.background.source의 {locale}·{device} 토큰을 치환한다.
+ * - source / source2 / theme.background.source / featureGraphic.source의 {locale}·{device} 토큰을 치환한다.
  */
 export function expandConfig(cfg, { locale, device }) {
   const warnings = [];
   const locales = Array.isArray(cfg.locales) ? cfg.locales : null;
   const sub = (s) => (typeof s === 'string' ? s.replaceAll('{locale}', locale).replaceAll('{device}', device) : s);
-  const warn = (i, code, message) => warnings.push({ level: 'warn', screen: i + 1, code, message });
+  // i가 null이면 특정 장이 아닌 항목(featureGraphic)이다
+  const warn = (i, code, message) => warnings.push({ level: 'warn', screen: i === null ? null : i + 1, code, message });
 
   const pick = (value, field, i) => {
     if (typeof value !== 'object' || value === null) return value;
@@ -56,5 +57,12 @@ export function expandConfig(cfg, { locale, device }) {
   const bg = cfg.theme?.background;
   const theme = bg?.source ? { ...cfg.theme, background: { ...bg, source: sub(bg.source) } } : cfg.theme;
   const { devices: _devices, locales: _locales, ...rest } = cfg;
-  return { config: { ...rest, locale, device, theme, screens }, warnings };
+  const out = { ...rest, locale, device, theme, screens };
+  const fg = cfg.featureGraphic;
+  if (fg && typeof fg === 'object') {
+    out.featureGraphic = { ...fg, headline: pick(fg.headline, 'featureGraphic.headline', null) };
+    if (fg.subhead !== undefined) out.featureGraphic.subhead = pick(fg.subhead, 'featureGraphic.subhead', null);
+    if (fg.source !== undefined) out.featureGraphic.source = sub(fg.source);
+  }
+  return { config: out, warnings };
 }

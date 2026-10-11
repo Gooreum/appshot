@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { loadConfig } from '../config.js';
-import { scanOutput, evaluate } from '../status.js';
+import { scanOutput, scanFeatureGraphics, evaluate } from '../status.js';
 
 /**
  * status 커맨드 — 제출 전 점검. 읽기만 한다.
@@ -10,7 +10,8 @@ import { scanOutput, evaluate } from '../status.js';
 export async function run({ opts }) {
   const cwd = process.cwd();
   const cfg = loadConfig(cwd);
-  const result = evaluate(scanOutput(path.resolve(cwd, cfg.output)), cfg, { cwd, ipad: Boolean(opts.ipad) });
+  const outRoot = path.resolve(cwd, cfg.output);
+  const result = evaluate(scanOutput(outRoot), cfg, { cwd, ipad: Boolean(opts.ipad), featureGraphics: scanFeatureGraphics(outRoot) });
 
   if (opts.json) {
     console.log(JSON.stringify(result, null, 2));

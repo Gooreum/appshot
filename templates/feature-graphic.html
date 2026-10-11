@@ -1,0 +1,59 @@
+<style>
+  /*
+   * Play 피처 그래픽(1024×500) — 왼쪽 카피 + 오른쪽 기기 1대.
+   * 기기는 caption-top처럼 아래로 넘쳐 캔버스 하단에서 잘린다.
+   * 기기가 없으면(.is-copy-only) 카피를 가운데에 둔다.
+   *
+   * --u는 짧은 변(500px) 기준이라 세로 스크린샷 배율 그대로면 헤드라인이 28px로 작다.
+   * 스토어가 이 이미지를 더 줄여 보여 주므로 이 템플릿에서만 타이포를 키운다.
+   */
+  :root {
+    --headline-size: calc(var(--u) * var(--headline-scale, 5.6) * 1.8);
+    --subhead-size: calc(var(--u) * var(--subhead-scale, 2.9) * 1.8);
+    --copy-gap: calc(var(--u) * 2.4);
+  }
+
+  .stage--feature {
+    flex-direction: row;
+    align-items: center;
+    gap: calc(var(--u) * 6);
+    padding: 0 var(--safe-x);
+  }
+
+  .stage--feature .copy {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0;
+    text-align: left;
+  }
+
+  .stage--feature .device-area {
+    flex: 0 0 auto;
+    width: auto;
+    align-self: flex-start;
+    padding-top: var(--safe-top);
+  }
+
+  .stage--feature.is-copy-only {
+    justify-content: center;
+  }
+
+  .stage--feature.is-copy-only .copy {
+    flex: 0 1 auto;
+    max-width: 80%;
+    text-align: center;
+  }
+</style>
+
+<div class="bg"></div>
+<div class="noise"></div>
+
+<div class="stage stage--feature {{stageClass}}">
+  <div class="copy">
+    <h1 class="headline">{{headline}}</h1>
+    {{#subhead}}<p class="subhead">{{subhead}}</p>{{/subhead}}
+  </div>
+  {{#device}}<div class="device-area">
+    {{{device}}}
+  </div>{{/device}}
+</div>

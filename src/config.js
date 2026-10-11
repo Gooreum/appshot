@@ -56,6 +56,8 @@ export function defaultConfig(opts = {}) {
     // 호출마다 새 객체 — 반환된 config를 고쳐도 다음 기본값에 번지지 않게
     screens: (platform === 'android' ? [...BASE_SCREENS, ANDROID_EXTRA_SCREEN] : BASE_SCREENS)
       .map((s) => ({ ...s })),
+    // Play는 피처 그래픽(1024×500)이 필수다 — 기본값에 넣어 두면 init 직후 render 한 번으로 갖춰진다
+    ...(PLATFORMS[platform].featureGraphic ? { featureGraphic: { ...ANDROID_FEATURE_GRAPHIC } } : {}),
   };
 }
 
@@ -79,6 +81,12 @@ const BASE_SCREENS = [
     subhead: '모든 기기에서 실시간으로 동기화',
   },
 ];
+
+const ANDROID_FEATURE_GRAPHIC = {
+  headline: '기록은 짧게, 정리는 자동으로',
+  subhead: '3초 만에 기록하고 한눈에 보세요',
+  source: 'screens/01.png',
+};
 
 const ANDROID_EXTRA_SCREEN = {
   source: 'screens/04.png',
@@ -160,6 +168,8 @@ export function validateConfig(cfg) {
     });
   }
 
+  if (cfg.featureGraphic !== undefined) validateFeatureGraphic(cfg.featureGraphic, cfg.platform, push);
+
   const t = cfg.theme;
   if (!t || typeof t !== 'object') {
     push('theme이 없습니다.');
@@ -205,6 +215,26 @@ const isCopy = (v) =>
   typeof v === 'string' ||
   (Boolean(v) && typeof v === 'object' && !Array.isArray(v) &&
     Object.keys(v).length > 0 && Object.values(v).every((x) => typeof x === 'string'));
+
+/** featureGraphic { headline, subhead?, source? } — Play 전용 자산이라 다른 플랫폼에서는 거부한다 */
+function validateFeatureGraphic(fg, platform, push) {
+  const at = 'featureGraphic';
+  if (!fg || typeof fg !== 'object' || Array.isArray(fg)) {
+    return push(`${at}은 객체여야 합니다. 예: { "headline": "...", "source": "screens/01.png" }`);
+  }
+  if (Object.hasOwn(PLATFORMS, platform) && !PLATFORMS[platform].featureGraphic) {
+    push(`${at}은 platform android에서만 씁니다 (지금 '${platform}').`);
+  }
+  if (!isCopy(fg.headline)) {
+    push(`${at}.headline은 문자열이거나 로케일별 맵({ "ko": "...", "en": "..." })이어야 합니다.`);
+  }
+  if (fg.subhead !== undefined && !isCopy(fg.subhead)) {
+    push(`${at}.subhead는 문자열이거나 로케일별 맵이어야 합니다.`);
+  }
+  if (fg.source !== undefined && (typeof fg.source !== 'string' || !fg.source.trim())) {
+    push(`${at}.source가 비어 있습니다. 기기에 넣을 앱 화면 경로를 적거나 키를 지우세요.`);
+  }
+}
 
 /**
  * theme.fontFile 형태 검사 — 문자열(경로) 또는 { path, weight }[].
