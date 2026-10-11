@@ -446,9 +446,9 @@ export function validateImage(buf) {
 }
 
 /** 경고를 사람이 읽는 형태로 출력한다. */
-export function printWarnings(warnings) {
+export function printWarnings(warnings, label) {
   if (!warnings.length) return;
-  console.log(`\n  품질 점검 — ${warnings.length}건`);
+  console.log(`\n  품질 점검${label ? ` [${label}]` : ''} — ${warnings.length}건`);
   for (const w of warnings) {
     console.log(`    [${w.screen === null ? '전체' : `${w.screen}번`}] ${w.message}`);
   }

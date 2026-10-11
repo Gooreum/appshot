@@ -8,3 +8,10 @@ test('--allow-crop 은 opts.allowCrop 으로 들어온다', () => {
   assert.equal(opts['allow-crop'], undefined);
   assert.equal(opts.preview, true);
 });
+
+test('--all 은 값을 먹지 않는 boolean 플래그다', () => {
+  const { opts, positional } = parseArgs(['render', '--all', 'extra', '--preview']);
+  assert.equal(opts.all, true);
+  assert.deepEqual(positional, ['extra']);
+  assert.equal(opts.preview, true);
+});
