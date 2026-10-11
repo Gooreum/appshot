@@ -157,6 +157,26 @@ CSS 값이 아니라 픽셀을 재는 이유가 있다. CSS를 읽으면 내가 
 기기 하단이 잘린 연출을 일부러 쓰려면 `theme.allowDeviceCrop: true` 또는 `render --allow-crop`으로
 명시해야 한다. 이때만 자동 축소를 건너뛰고 잘림 검사를 통과시킨다.
 
+### 제출 전 점검 — `appshot status`
+
+경고와 게이트는 **한 장**을 본다. 출력 폴더 **전체**가 스토어 제출 요건을 채웠는지는 `status`가 본다.
+렌더는 config 한 벌의 결과만 쓰고 끝나므로, 필수 기기 폴더가 빠졌거나 프리뷰·실패한 렌더가 남긴 파일이
+섞여 있어도 업로드 단계에서야 발견되기 때문이다.
+
+| 코드 | 수준 | 조건 |
+|---|---|---|
+| `missing-required` | 에러 | 로케일에 필수 슬롯이 비었다 — iOS는 6.9" 또는 6.5", iPad 앱(config에 iPad가 있거나 iPad 폴더가 있거나 `--ipad`)이면 13", Mac, Play는 합계 2장 |
+| `preview-size` / `size-mismatch` | 에러 | PNG 해상도가 프리뷰 축소 크기이거나(프리뷰가 원본을 덮었다) 기기 규격과 다르다 |
+| `count-max` / `count-min` | 에러 | 슬롯당 장수가 iOS·Mac 1~10, Android 0~8을 벗어난다 |
+| `stale` / `orphan` / `gap` | 에러 | **현재 config 대상 폴더만** — config·소스보다 오래된 결과물 / `screens`보다 큰 번호 / 1~N 중 빠진 번호 |
+| `locale-missing` | 에러 | config(`devices`×`locales`) 대상 폴더가 없다 |
+| `count-recommend` · `slot-duplicate` · `locale-diff` · `unknown-entry` | 경고 | Play 폰 4장 미만 / 같은 슬롯 폴더 중복 / 일부 로케일에만 있는 슬롯 / 알 수 없는 폴더·파일 |
+
+에러가 하나라도 있으면 "제출 불가"와 종료 코드 1, 없으면 "제출 준비 완료"와 0이다. 경고만으로는 실패하지 않는다.
+`_preview/`와 `overview.png`는 무시한다. 다른 로케일·기기 폴더는 지금 config와 비교할 근거가 없어 `stale`을 판정하지 않는다.
+`stale`은 mtime으로만 본다 — git checkout이나 클라우드 동기화로 mtime이 바뀌면 빗나갈 수 있어, 메시지는 사실("나중에 수정됨")과
+해결책(재렌더)만 적는다. `--json`은 에이전트용 원본 결과다.
+
 ---
 
 ## 설치
@@ -188,6 +208,7 @@ $APPSHOT layouts                          # 레이아웃 5종 설명
 $APPSHOT render --preview                 # 1/3 해상도로 빠르게 확인
 $APPSHOT render                           # 제출용 원본
 $APPSHOT render --all                     # devices × locales 조합 전부
+$APPSHOT status                           # 업로드 전 점검 — 필수 슬롯·해상도·장수·오래된 파일 (문제 있으면 exit 1)
 ```
 
 앱 화면이 아직 없으면 `render --placeholder`로 자리표시자를 넣어 카피와 레이아웃을 먼저 확정할 수 있다.
@@ -352,7 +373,10 @@ src/
   frame-gate.js          프레임 게이트 — 최종 PNG 픽셀 검사
   quality.js             경고 규칙 (가독성·스토어 정책·소스·배경)
   capture.js             simctl / adb / screencapture 래퍼
-  commands/              doctor · devices · init · layouts · capture · render
+  status.js              제출 전 점검 — 출력 폴더 스캔과 판정 (순수 로직)
+  overview.js            개요 시트 HTML과 캡처
+  expand.js              다중 config(devices·locales·카피 맵) 펼치기
+  commands/              doctor · devices · init · layouts · capture · render · status
 templates/
   base.css               공통 타이포·여백 (--u 단위)
   layout-*.html          레이아웃 5종
