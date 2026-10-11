@@ -93,6 +93,8 @@ node ~/.claude/skills/appshot/bin/appshot.mjs devices --platform ios
 
 **[D2]** 출력에서 `[필수]` 슬롯을 첫 선택지(Recommended)로 두고 AskUserQuestion으로 고르게 한다.
 iPad에서도 도는 앱이면 iPhone과 iPad를 함께 고를 수 있게 multiSelect로 묻는다.
+여럿을 고르면 config를 나누지 않는다 — `device` 대신 `devices: ["iphone-17-pro-max", "ipad-pro-13"]` 배열로 적고
+`render --all`로 한 번에 렌더한다 (아래 '주의' 참고).
 
 - App Store는 **iPhone 6.9" 또는 6.5" 중 하나**가 필수 — 기본은 6.9"(1290×2796).
   iPad에서 도는 앱이면 **iPad 13"(2064×2752)** 도 필수
@@ -281,7 +283,7 @@ init       appshot.config.json + screens/ 생성   [--platform] [--device] [--fo
 devices    디바이스와 스토어 규격 목록            [--platform] [--json]
 layouts    레이아웃 5종 설명                     [--json]
 capture    시뮬레이터/기기/맥 창에서 화면 캡처     --platform ios|macos|android [--name] [--force]
-render     스토어 스크린샷 생성                  [--only 1,3] [--preview] [--placeholder] [--allow-crop] [--no-overview]
+render     스토어 스크린샷 생성                  [--all] [--only 1,3] [--preview] [--placeholder] [--allow-crop] [--no-overview]
 ```
 
 ## 참고 문서
@@ -291,9 +293,12 @@ render     스토어 스크린샷 생성                  [--only 1,3] [--previe
 
 ## 주의
 
-- 출력은 `{output}/{locale}/{device}/01.png` 형식으로 쌓인다. 로케일이 여럿이면
-  `locale`을 바꿔가며 여러 번 렌더한다. `--preview`는 `{output}/_preview/{locale}/{device}/`에
+- 출력은 `{output}/{locale}/{device}/01.png` 형식으로 쌓인다. `--preview`는 `{output}/_preview/{locale}/{device}/`에
   따로 쌓이므로 제출할 때는 `_preview` 밖의 파일을 쓴다. 폴더마다 생기는 `overview.png`도 제출 대상이 아니다
+- **로케일·기기가 여럿이면 config를 복사하지 않는다.** `devices: [...]`, `locales: [...]` 배열을 적고
+  `headline`/`subhead`를 `{ "ko": "...", "en": "..." }` 맵으로, 소스 경로는 `screens/{locale}/{device}/01.png`처럼
+  토큰으로 쓴다. `render --all`이 모든 조합을 돌고, 번역이 빠진 장은 기본 로케일 문구로 렌더하며 `copy-missing`
+  경고를 낸다. `--all` 없이 `render`하면 기본 조합 하나만 렌더한다(프리뷰용). 플랫폼이 다르면(iOS + Android) config를 나눈다
 - `deviceScaleFactor: 1`로 고정되어 있어 출력 크기가 항상 규격과 1:1이다.
   이 값을 건드리면 2배 크기로 나와 스토어가 리젝한다
 - 폰트는 시스템 스택 또는 `theme.fontFile`(파일을 data URI로 인라인)만 쓴다. 네트워크 폰트를 넣으면 렌더 결과가 재현되지 않는다

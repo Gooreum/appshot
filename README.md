@@ -187,6 +187,7 @@ $APPSHOT capture --platform ios           # 부팅된 시뮬레이터에서 상�
 $APPSHOT layouts                          # 레이아웃 5종 설명
 $APPSHOT render --preview                 # 1/3 해상도로 빠르게 확인
 $APPSHOT render                           # 제출용 원본
+$APPSHOT render --all                     # devices × locales 조합 전부
 ```
 
 앱 화면이 아직 없으면 `render --placeholder`로 자리표시자를 넣어 카피와 레이아웃을 먼저 확정할 수 있다.
@@ -222,8 +223,33 @@ Claude Code에서는 "앱스토어 스크린샷 만들어줘"라고 요청하면
 }
 ```
 
-- 로케일이 여럿이면 `locale`을 바꿔 여러 번 렌더한다. 출력은 `{output}/{locale}/{device}/`로 나뉜다. `--preview`는 제출용을 덮지 않도록 `{output}/_preview/{locale}/{device}/`에 따로 쓴다
-- 기기가 여럿(iPhone + iPad)이면 config를 기기별로 나눠 렌더한다. 규격과 레이아웃 치수가 다르기 때문이다
+출력은 `{output}/{locale}/{device}/`로 나뉜다. `--preview`는 제출용을 덮지 않도록 `{output}/_preview/{locale}/{device}/`에 따로 쓴다.
+
+### 로케일·기기가 여럿일 때 — `render --all`
+
+로케일을 추가할 때마다, 기기 슬롯마다 config를 복사하지 않는다. config 하나에 `devices`·`locales` 배열을 적고
+카피를 로케일별 맵으로 쓰면 `render --all`이 모든 조합을 `{output}/{locale}/{device}/`에 렌더한다.
+카피와 테마가 한 곳에 있으니 고치면 모든 조합에 반영된다.
+
+```json
+{
+  "platform": "ios",
+  "devices": ["iphone-17-pro-max", "ipad-pro-13"],
+  "locales": ["ko", "en"],
+  "screens": [
+    { "source": "screens/{locale}/{device}/01.png", "layout": "caption-top",
+      "headline": { "ko": "3초 만에 기록", "en": "Log in 3 seconds" },
+      "subhead":  { "ko": "복잡한 설정 없이", "en": "No setup needed" } }
+  ]
+}
+```
+
+- `headline`·`subhead`는 문자열이어도 된다. 문자열이면 모든 로케일에 같은 문구가 들어간다
+- `source`·`source2`·`theme.background.source`에는 `{locale}`·`{device}` 토큰을 쓸 수 있다. iPhone과 iPad는 캡처가 다르고 현지화된 UI는 로케일마다 캡처가 다르기 때문이다
+- 번역이 빠진 장은 기본 로케일(`locales[0]`) 문구로 렌더하고 `copy-missing` 경고를 낸다. `locales`에 없는 키(`en-US` 같은 오타)는 `copy-unknown-locale` 경고
+- 조합 하나가 실패해도 나머지는 계속 렌더하고, 끝에 실패를 모아 보여준 뒤 종료 코드 1로 끝난다
+- `--all` 없이 `render`하면 기본 조합 하나(`device`·`locale` 스칼라가 있으면 그것, 없으면 각 배열의 첫 번째)만 렌더한다. 프리뷰로 빠르게 볼 때 쓴다
+- `devices`는 모두 `platform`과 같은 플랫폼이어야 한다. iOS + Android처럼 플랫폼이 다르면 config를 나눈다
 
 ### 캡처
 
