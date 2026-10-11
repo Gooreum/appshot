@@ -17,7 +17,7 @@
  * 플랫폼별 제출 규칙. render의 장수 경고와 status의 필수 슬롯 판정이 함께 쓴다 — 값이 두 곳에 있지 않게.
  *   shots          — 슬롯(기기 유형)당 장수 범위
  *   requiredSlots  — 'OR 묶음'의 배열. 묶음마다 storeSlot 중 하나는 채워야 한다
- *   tabletSlot     — 조건부 필수(iPad 앱이면 13"). status가 iPad 폴더 유무/--ipad로 판정한다
+ *   tabletSlot     — 조건부 필수(iPad 앱이면 13"). status가 iPad 폴더 유무/config 기기/--ipad로 판정한다
  *   totalMin       — 기기 유형을 합친 최소 장수 (Play)
  *   recommendMin   — 추천 영역 노출에 필요한 장수 (Play)
  */
