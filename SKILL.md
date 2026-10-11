@@ -226,11 +226,14 @@ node ~/.claude/skills/appshot/bin/appshot.mjs render --preview
 node ~/.claude/skills/appshot/bin/appshot.mjs render
 ```
 
-**결과물을 Read 도구로 직접 열어 눈으로 확인한다.** 규격이 맞는 것과
-보기 좋은 것은 다른 문제다. 큰 PNG는 `sips -Z 900`으로 축소본을 만들어 본다.
+**결과물을 Read 도구로 직접 열어 눈으로 확인한다.** 규격이 맞는 것과 보기 좋은 것은 다른 문제다.
+① 먼저 outDir의 **`overview.png`**(세트 전체를 넘겨보기 줄 + 썸네일 줄로 모은 개요 시트)를 열어
+세트 단위로 점검한다 — 여러 장이 같은 구성이라 단조롭지 않은지, 카피 길이가 장마다 균형이 맞는지,
+썸네일 줄에서 헤드라인이 읽히는지. ② 문제가 있는 장만 개별 PNG로 연다. 큰 PNG는 `sips -Z 900`으로
+축소본을 만들어 본다. `overview.png`는 제출 대상이 아니다 — 업로드할 때 뺀다 (`--no-overview`로 끌 수 있다).
 
 **[D8]** 프리뷰를 보여준 뒤 "원본 렌더 (Recommended)" / "카피 수정" / "레이아웃·순서 수정" / "색·배경 수정"을
-AskUserQuestion으로 묻는다. 수정을 고르면 해당 결정 지점(D5·D6·D7)으로 돌아간다.
+AskUserQuestion으로 묻는다. 각 선택지의 `preview`에 개요 시트에서 본 관찰(단조로움·긴 카피·썸네일 가독성)을 요약해 넣는다. 수정을 고르면 해당 결정 지점(D5·D6·D7)으로 돌아간다.
 
 ### 프레임 게이트 (렌더를 막는 검사)
 
@@ -278,7 +281,7 @@ init       appshot.config.json + screens/ 생성   [--platform] [--device] [--fo
 devices    디바이스와 스토어 규격 목록            [--platform] [--json]
 layouts    레이아웃 5종 설명                     [--json]
 capture    시뮬레이터/기기/맥 창에서 화면 캡처     --platform ios|macos|android [--name] [--force]
-render     스토어 스크린샷 생성                  [--only 1,3] [--preview] [--placeholder] [--allow-crop]
+render     스토어 스크린샷 생성                  [--only 1,3] [--preview] [--placeholder] [--allow-crop] [--no-overview]
 ```
 
 ## 참고 문서
@@ -290,7 +293,7 @@ render     스토어 스크린샷 생성                  [--only 1,3] [--previe
 
 - 출력은 `{output}/{locale}/{device}/01.png` 형식으로 쌓인다. 로케일이 여럿이면
   `locale`을 바꿔가며 여러 번 렌더한다. `--preview`는 `{output}/_preview/{locale}/{device}/`에
-  따로 쌓이므로 제출할 때는 `_preview` 밖의 파일을 쓴다
+  따로 쌓이므로 제출할 때는 `_preview` 밖의 파일을 쓴다. 폴더마다 생기는 `overview.png`도 제출 대상이 아니다
 - `deviceScaleFactor: 1`로 고정되어 있어 출력 크기가 항상 규격과 1:1이다.
   이 값을 건드리면 2배 크기로 나와 스토어가 리젝한다
 - 폰트는 시스템 스택 또는 `theme.fontFile`(파일을 data URI로 인라인)만 쓴다. 네트워크 폰트를 넣으면 렌더 결과가 재현되지 않는다
