@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { getLayout, frameWidthFor } from './layouts.js';
 import { WINDOW_TITLEBAR } from './frame.js';
+import { PLATFORMS } from './devices.js';
 
 /**
  * 품질 게이트.
@@ -27,11 +28,6 @@ const CONTRAST_MIN = 3.0;
 const RATIO_TOLERANCE = 0.03;
 
 const CJK = /[ᄀ-ᇿ㄰-㆏가-힯぀-ヿ一-鿿]/;
-
-/** 스토어별 업로드 가능 최대 장수와, Play 추천 영역 노출에 필요한 최소 장수. */
-const MAX_SCREENS = { ios: 10, macos: 10, android: 8 };
-const STORE_LABEL = { ios: 'App Store', macos: 'Mac App Store', android: 'Google Play' };
-const PLAY_RECOMMEND_MIN = 4;
 
 /** 카피가 이미지에서 차지해도 되는 최대 면적 (Google Play: "not more than 20% of the image"). */
 const COPY_AREA_MAX = 0.2;
@@ -199,16 +195,18 @@ function checkBackground(cfg, device, cwd, add) {
   }
 }
 
+/** 장수 — 스토어별 최대 장수와 Play 추천 영역 노출 조건은 devices.js의 PLATFORMS에 있다. */
 function checkCount(cfg, add) {
-  const store = MAX_SCREENS[cfg.platform] ? cfg.platform : 'ios';
+  const store = PLATFORMS[cfg.platform] ? cfg.platform : 'ios';
+  const { shots, recommendMin } = PLATFORMS[store];
   const n = cfg.screens.length;
-  if (n > MAX_SCREENS[store]) {
+  if (n > shots.max) {
     add(null, 'count-max',
-      `스크린샷이 ${n}장입니다. ${STORE_LABEL[store]}는 기기 유형당 최대 ${MAX_SCREENS[store]}장까지 올릴 수 있습니다.`);
+      `스크린샷이 ${n}장입니다. ${PLATFORMS[store].store}는 기기 유형당 최대 ${shots.max}장까지 올릴 수 있습니다.`);
   }
-  if (store === 'android' && n < PLAY_RECOMMEND_MIN) {
+  if (recommendMin && n < recommendMin) {
     add(null, 'count-recommend',
-      `스크린샷이 ${n}장입니다. Google Play 추천 영역에 노출되려면 ${PLAY_RECOMMEND_MIN}장 이상이 필요합니다.`);
+      `스크린샷이 ${n}장입니다. Google Play 추천 영역에 노출되려면 ${recommendMin}장 이상이 필요합니다.`);
   }
 }
 

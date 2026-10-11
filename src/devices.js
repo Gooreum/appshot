@@ -13,11 +13,37 @@
  * 같은 비율로 그려지므로 규격이 바뀌어도 생김새가 유지된다.
  */
 
+/*
+ * 플랫폼별 제출 규칙. render의 장수 경고와 status의 필수 슬롯 판정이 함께 쓴다 — 값이 두 곳에 있지 않게.
+ *   shots          — 슬롯(기기 유형)당 장수 범위
+ *   requiredSlots  — 'OR 묶음'의 배열. 묶음마다 storeSlot 중 하나는 채워야 한다
+ *   tabletSlot     — 조건부 필수(iPad 앱이면 13"). status가 iPad 폴더 유무/--ipad로 판정한다
+ *   totalMin       — 기기 유형을 합친 최소 장수 (Play)
+ *   recommendMin   — 추천 영역 노출에 필요한 장수 (Play)
+ */
 export const PLATFORMS = {
-  ios: { label: 'Apple', store: 'App Store' },
-  macos: { label: 'Mac', store: 'Mac App Store' },
-  android: { label: 'Android', store: 'Google Play' },
+  ios: {
+    label: 'Apple', store: 'App Store',
+    shots: { min: 1, max: 10 },
+    requiredSlots: [['iPhone 6.9" 디스플레이', 'iPhone 6.5" 디스플레이']],
+    tabletSlot: 'iPad 13" 디스플레이',
+  },
+  macos: {
+    label: 'Mac', store: 'Mac App Store',
+    shots: { min: 1, max: 10 },
+    requiredSlots: [['Mac 디스플레이 (2880×1800)']],
+  },
+  android: {
+    label: 'Android', store: 'Google Play',
+    shots: { min: 0, max: 8 },
+    requiredSlots: [],
+    totalMin: 2,
+    recommendMin: 4,
+  },
 };
+
+/** 프리뷰 축소 비율. render가 쓰고, status가 "프리뷰가 원본을 덮었는지" 판정할 때도 쓴다. */
+export const PREVIEW_SCALE = 0.34;
 
 export const DEVICES = {
   // ─── iOS ────────────────────────────────────────────────────────────────
@@ -151,9 +177,9 @@ export const DEVICES = {
   // 이 기기는 이 카탈로그에서 **유일한 가로 규격**이다. layouts.js가 isLandscape로
   // 갈라져 다른 치수를 쓴다 — 세로 값을 그대로 쓰면 폭이 상한에 걸려 카피 자리가 사라진다.
   //
-  // frame을 채워 두긴 하지만 기본값은 프레임 없음이다(config.js의 deviceFrame).
-  // Mac 스크린샷에 넣는 것은 바탕화면이 아니라 앱 **창**이고,
-  // 창을 노트북 베젤 안에 넣으면 바탕화면이 없어 어색해진다.
+  // 기본값은 앱 **창** 목업이다(config.js의 deviceFrame: true → frame.chrome 'window').
+  // Mac 스크린샷에 넣는 것은 바탕화면이 아니라 앱 창이고,
+  // 창을 노트북 베젤 안에 넣으면 바탕화면이 없어 어색해진다. 노트북 프레임 수치는 쓰지 않는다.
   'mac-16-10': {
     label: 'Mac 16:10',
     platform: 'macos',
