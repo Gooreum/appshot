@@ -7,6 +7,7 @@ import { buildHTML, BRAND_FONT_FAMILY } from './html.js';
 import { normalizeFontFiles } from './config.js';
 import { checkAll, checkCopyArea, sizeFromBuffer, validateImage } from './quality.js';
 import { checkFrame, FrameGateError } from './frame-gate.js';
+import { renderOverview, OVERVIEW_FILE } from './overview.js';
 
 const MIME = {
   '.png': 'image/png',
@@ -36,7 +37,7 @@ const PREVIEW_SCALE = 0.34;
  * deviceScaleFactor를 지정하지 않으면 환경에 따라 2배 크기로 나오는데,
  * 이것이 스토어 스크린샷 리젝의 가장 흔한 원인이다.
  */
-export async function renderAll(cfg, { preview = false, only = null, placeholder = false, allowCrop = false, cwd = process.cwd(), onProgress, onWarnings } = {}) {
+export async function renderAll(cfg, { preview = false, only = null, placeholder = false, allowCrop = false, overview = true, cwd = process.cwd(), onProgress, onWarnings } = {}) {
   const device = getDevice(cfg.device);
 
   // 품질 점검은 렌더를 막지 않는다 — 의도적으로 규칙을 깨는 디자인도 있고,
@@ -136,6 +137,8 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
   const browser = await chromium.launch();
   const results = [];
   const gateFailed = [];
+  const rendered = new Map(); // index → PNG 버퍼. 개요 시트가 다시 읽지 않게 모아 둔다
+  let overviewFile = null;
 
   try {
     const page = await browser.newPage({
@@ -179,11 +182,25 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
         }
       }
       fs.writeFileSync(file, png);
+      rendered.set(index, png);
 
       const stat = fs.statSync(file);
       const result = { file, index: index + 1, layout: screen.layout, bytes: stat.size, canvas };
       results.push(result);
       onProgress?.(result);
+    }
+
+    // 개요 시트 — 게이트가 실패했으면 만들지 않고 이전 것도 지운다(옛 개요가 이번 결과처럼 보이면 안 된다).
+    // 개요 생성 실패는 렌더 실패가 아니다 — 장별 PNG는 이미 저장됐으므로 경고만 남긴다.
+    const overviewPath = path.join(outDir, OVERVIEW_FILE);
+    if (gateFailed.length) {
+      fs.rmSync(overviewPath, { force: true });
+    } else if (overview) {
+      try {
+        overviewFile = await renderOverview(page, { outDir, cfg, rendered, canvas });
+      } catch (err) {
+        warnings.push({ level: 'warn', screen: null, code: 'overview-failed', message: `개요 시트를 만들지 못했습니다: ${err.message}` });
+      }
     }
   } finally {
     await browser.close(); // 렌더가 중간에 실패해도 좀비 프로세스를 남기지 않는다
@@ -191,7 +208,7 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
 
   if (warnings.length) onWarnings?.(warnings);
   if (gateFailed.length) throw new FrameGateError(gateFailed);
-  return { results, outDir, canvas, device, preview, warnings };
+  return { results, outDir, canvas, device, preview, warnings, overview: overviewFile };
 }
 
 /**

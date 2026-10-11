@@ -12,11 +12,12 @@ export async function run({ opts }) {
   const only = Array.isArray(opts.only) ? opts.only : null;
   const preview = Boolean(opts.preview);
 
-  const { results, outDir, canvas, device } = await renderAll(cfg, {
+  const { results, outDir, canvas, device, overview } = await renderAll(cfg, {
     preview,
     only,
     placeholder: Boolean(opts.placeholder),
     allowCrop: Boolean(opts.allowCrop),
+    overview: !opts.noOverview,
     cwd,
     onWarnings: printWarnings,
     onProgress: (r) => {
@@ -28,6 +29,7 @@ export async function run({ opts }) {
   const spec = `${canvas.w}×${canvas.h}`;
   console.log('');
   console.log(`  ${results.length}장 생성 — ${path.relative(cwd, outDir) || outDir}`);
+  if (overview) console.log(`  개요 시트 — ${path.relative(cwd, overview)} (제출용 아님)`);
 
   if (preview) {
     console.log(`  프리뷰 해상도 ${spec} (제출 규격은 ${canvasLabel(device)})`);
