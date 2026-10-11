@@ -15,3 +15,7 @@ test('--all 은 값을 먹지 않는 boolean 플래그다', () => {
   assert.deepEqual(positional, ['extra']);
   assert.equal(opts.preview, true);
 });
+
+test('--ipad 는 boolean 플래그다', () => {
+  assert.equal(parseArgs(['status', '--ipad']).opts.ipad, true);
+});
