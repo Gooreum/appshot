@@ -33,7 +33,14 @@ function template(name) {
  */
 const asImage = (v) => (typeof v === 'string' ? { uri: v, size: null } : v);
 
-export function buildHTML({ cfg, screen, device, index = 0, total = 1, images = {} }) {
+/** 브랜드 폰트의 내부 패밀리 이름. 사용자 입력이 CSS에 들어가지 않도록 고정한다. */
+export const BRAND_FONT_FAMILY = 'appshot-brand';
+
+/**
+ * fonts: [{ uri, format, weight|null }] — render.js가 파일을 data URI로 읽어 넘긴다.
+ * 비어 있으면 출력은 폰트 지원 전과 바이트 단위로 같다.
+ */
+export function buildHTML({ cfg, screen, device, index = 0, total = 1, images = {}, fonts = [] }) {
   const layout = getLayout(screen.layout);
   const canvas = cfg.canvasOverride ?? device.canvas;
   images = {
@@ -78,12 +85,12 @@ export function buildHTML({ cfg, screen, device, index = 0, total = 1, images = 
 <head>
 <meta charset="utf-8">
 <style>
-:root {
+${fontFaceCSS(fonts)}:root {
   --canvas-w: ${canvas.w}px;
   --canvas-h: ${canvas.h}px;
   /* base.css의 --u가 쓰는 기준. 짧은 변의 1% — 가로 규격에서 폭을 쓰면 글자가 커진다 */
   --unit: ${Math.min(canvas.w, canvas.h) / 100}px;
-  --font-stack: ${cfg.theme.fontStack};
+  --font-stack: ${fonts.length ? `'${BRAND_FONT_FAMILY}', ` : ''}${cfg.theme.fontStack};
   --headline-color: ${cfg.theme.headline.color};
   --headline-weight: ${cfg.theme.headline.weight ?? 800};
   --headline-scale: ${(cfg.theme.headline.size ?? 0.056) * 100};
@@ -103,6 +110,21 @@ ${usesDevice ? (windowed ? windowCSS(frameW) : framed ? frameCSS(device, frameW)
 ${body}
 </body>
 </html>`;
+}
+
+/**
+ * 브랜드 폰트 @font-face.
+ * 단일 파일(weight 없음)이면 1~1000 전 구간에 매칭시킨다 — 헤드라인 800과 서브카피 500이
+ * 같은 파일로 떨어지고 크롬이 가짜 볼드(synthetic bold)를 만들지 않는다. 가변 폰트에도 맞는 값이다.
+ */
+function fontFaceCSS(fonts) {
+  return fonts.map((f) => `@font-face {
+  font-family: '${BRAND_FONT_FAMILY}';
+  src: url("${f.uri}") format('${f.format}');
+  font-weight: ${f.weight ?? '1 1000'};
+  font-display: block;
+}
+`).join('');
 }
 
 /**
