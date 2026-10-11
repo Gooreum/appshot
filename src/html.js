@@ -86,7 +86,25 @@ export function buildHTML({ cfg, screen, device, index = 0, total = 1, images = 
 <meta charset="utf-8">
 <style>
 ${fontFaceCSS(fonts)}:root {
-  --canvas-w: ${canvas.w}px;
+${themeVars(cfg, canvas, fonts)}
+  --device-w: ${frameW}px;
+  --device-hpw: ${heightPerWidth(device, layout, { framed, aspect }).toFixed(5)};
+  --screen-aspect: ${screenAspect ? `${images.main.size.w} / ${images.main.size.h}` : '16 / 10'};
+}
+${baseCSS()}
+${backgroundCSS(cfg.theme.background, index, total, images.background)}
+${usesDevice ? (windowed ? windowCSS(frameW) : framed ? frameCSS(device, frameW) : plainCSS(device, frameW)) : ''}
+</style>
+</head>
+<body>
+${body}
+</body>
+</html>`;
+}
+
+/** :root의 캔버스·폰트·카피 변수. 스크린샷과 피처 그래픽이 같은 테마로 그려지도록 함께 쓴다. */
+function themeVars(cfg, canvas, fonts) {
+  return `  --canvas-w: ${canvas.w}px;
   --canvas-h: ${canvas.h}px;
   /* base.css의 --u가 쓰는 기준. 짧은 변의 1% — 가로 규격에서 폭을 쓰면 글자가 커진다 */
   --unit: ${Math.min(canvas.w, canvas.h) / 100}px;
@@ -96,14 +114,42 @@ ${fontFaceCSS(fonts)}:root {
   --headline-scale: ${(cfg.theme.headline.size ?? 0.056) * 100};
   --subhead-color: ${cfg.theme.subhead.color};
   --subhead-weight: ${cfg.theme.subhead.weight ?? 500};
-  --subhead-scale: ${(cfg.theme.subhead.size ?? 0.029) * 100};
-  --device-w: ${frameW}px;
-  --device-hpw: ${heightPerWidth(device, layout, { framed, aspect }).toFixed(5)};
-  --screen-aspect: ${screenAspect ? `${images.main.size.w} / ${images.main.size.h}` : '16 / 10'};
+  --subhead-scale: ${(cfg.theme.subhead.size ?? 0.029) * 100};`;
+}
+
+/** 피처 그래픽에서 기기 프레임 폭 (캔버스 폭 대비). 세로 기기라 아래로 넘쳐 잘리는 것이 의도다. */
+const FEATURE_DEVICE_WIDTH = 0.27;
+
+/**
+ * Play 피처 그래픽 HTML. cfg는 expandConfig로 펼친 단일 config(featureGraphic 카피가 문자열로 확정됨).
+ * images.main이 없으면(featureGraphic.source 없음) 기기 없이 카피만 가운데에 둔다.
+ * 배경은 장 구분이 없으므로 파노라마 없이 1장짜리로 그린다.
+ */
+export function buildFeatureGraphicHTML({ cfg, device, canvas, images = {}, fonts = [] }) {
+  const fg = cfg.featureGraphic ?? {};
+  const main = images.main ? asImage(images.main) : null;
+  const background = images.background ? asImage(images.background) : null;
+  const framed = cfg.theme.deviceFrame !== false;
+  const frameW = Math.round(canvas.w * FEATURE_DEVICE_WIDTH);
+  const imgTag = main ? `<img class="screen" src="${main.uri}" alt="">` : '';
+  const body = render(template('feature-graphic.html'), {
+    stageClass: main ? '' : 'is-copy-only',
+    headline: fg.headline ?? '',
+    subhead: fg.subhead ?? '',
+    device: main ? (framed ? frameHTML(device, imgTag) : plainHTML(imgTag)) : '',
+  });
+
+  return `<!doctype html>
+<html lang="${cfg.locale ?? 'ko'}">
+<head>
+<meta charset="utf-8">
+<style>
+${fontFaceCSS(fonts)}:root {
+${themeVars(cfg, canvas, fonts)}
 }
 ${baseCSS()}
-${backgroundCSS(cfg.theme.background, index, total, images.background)}
-${usesDevice ? (windowed ? windowCSS(frameW) : framed ? frameCSS(device, frameW) : plainCSS(device, frameW)) : ''}
+${backgroundCSS(cfg.theme.background, 0, 1, background)}
+${main ? (framed ? frameCSS(device, frameW) : plainCSS(device, frameW)) : ''}
 </style>
 </head>
 <body>

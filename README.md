@@ -170,6 +170,7 @@ CSS 값이 아니라 픽셀을 재는 이유가 있다. CSS를 읽으면 내가 
 | `count-max` / `count-min` | 에러 | 슬롯당 장수가 iOS·Mac 1~10, Android 0~8을 벗어난다 |
 | `stale` / `orphan` / `gap` | 에러 | **현재 config 대상 폴더만** — config·소스보다 오래된 결과물 / `screens`보다 큰 번호 / 1~N 중 빠진 번호 |
 | `locale-missing` | 에러 | config(`devices`×`locales`) 대상 폴더가 없다 |
+| `missing-feature-graphic` | 에러 | Android인데 로케일 폴더에 `feature-graphic.png`가 없다 (Play 게시 필수). 있으면 해상도(`size-mismatch`·`preview-size`)와 `stale`도 본다 |
 | `count-recommend` · `slot-duplicate` · `locale-diff` · `unknown-entry` | 경고 | Play 폰 4장 미만 / 같은 슬롯 폴더 중복 / 일부 로케일에만 있는 슬롯 / 알 수 없는 폴더·파일 |
 
 에러가 하나라도 있으면 "제출 불가"와 종료 코드 1, 없으면 "제출 준비 완료"와 0이다. 경고만으로는 실패하지 않는다.
@@ -246,6 +247,25 @@ Claude Code에서는 "앱스토어 스크린샷 만들어줘"라고 요청하면
 
 출력은 `{output}/{locale}/{device}/`로 나뉜다. `--preview`는 제출용을 덮지 않도록 `{output}/_preview/{locale}/{device}/`에 따로 쓴다.
 
+### Play 피처 그래픽 — `featureGraphic`
+
+Google Play는 스크린샷 외에 **피처 그래픽(1024×500)이 있어야 게시된다.** Android config에 `featureGraphic`을 적으면
+`render`가 스크린샷 뒤에 로케일마다 한 장씩 `{output}/{locale}/feature-graphic.png`로 만든다 (기기와 무관).
+`appshot init --platform android`의 기본 config에 예시가 들어 있다.
+
+```json
+"featureGraphic": {
+  "headline": { "ko": "기록은 짧게, 정리는 자동으로", "en": "Log fast. Sorted for you." },
+  "subhead": "3초 만에 기록하고 한눈에 보세요",
+  "source": "screens/{locale}/01.png"
+}
+```
+
+- 배경·폰트(`fontFile` 포함)·카피 색은 `theme`을 그대로 쓴다. 왼쪽에 카피, 오른쪽에 기기 1대(하단이 잘리는 구성). 기기 모양은 `theme.deviceFrame`을 따른다
+- `subhead`·`source`는 선택이다. `source`가 없으면 기기 없이 카피만 가운데에 놓는다. `headline`·`subhead`의 로케일 맵과 `source`의 `{locale}`·`{device}` 토큰은 `screens`와 같다
+- `--preview`면 `{output}/_preview/{locale}/feature-graphic.png`에 축소본을 쓴다. `--only`일 때는 만들지 않는다
+- Android 전용이다. 다른 플랫폼 config에 넣으면 검증 에러가 난다
+
 ### 로케일·기기가 여럿일 때 — `render --all`
 
 로케일을 추가할 때마다, 기기 슬롯마다 config를 복사하지 않는다. config 하나에 `devices`·`locales` 배열을 적고
@@ -297,6 +317,8 @@ Claude Code에서는 "앱스토어 스크린샷 만들어줘"라고 요청하면
 
 ¹ 6.9"와 6.5" 중 하나가 필수다. ² iPad에서 동작하는 앱일 때. ³ Mac 앱일 때 (2560×1600·1440×900·1280×800도 허용).
 기기 이름은 App Store Connect의 슬롯별 기기 목록을 따른다.
+
+Android는 기기 외에 로케일마다 **피처 그래픽 1024×500**(Play 게시 필수)을 만든다 — `featureGraphic` 참고.
 
 새 기기는 `src/devices.js`에 캔버스·화면 크기와 프레임 수치를 추가하면 된다.
 
@@ -380,6 +402,7 @@ src/
 templates/
   base.css               공통 타이포·여백 (--u 단위)
   layout-*.html          레이아웃 5종
+  feature-graphic.html   Play 피처 그래픽(1024×500) 가로 템플릿
 references/
   store-specs.md         스토어 공식 규정 요약과 원문 링크, 실제 반려 사유
   copywriting.md         헤드라인 작성 원칙

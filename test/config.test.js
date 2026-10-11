@@ -93,3 +93,28 @@ test('스칼라 device/locale이 배열에 없으면 거부한다', () => {
   assert.match(validateConfig(multi({ device: 'ipad-air-11' }))[0], /device 'ipad-air-11'가 devices 배열에 없습니다/);
   assert.match(validateConfig(multi({ locale: 'ja' }))[0], /locale 'ja'이 locales 배열에 없습니다/);
 });
+
+test('featureGraphic — android 기본값에 들어 있고, 문자열·맵 카피와 source 생략을 받는다', () => {
+  const cfg = defaultConfig({ platform: 'android' });
+  assert.equal(typeof cfg.featureGraphic.headline, 'string');
+  assert.equal(defaultConfig({ platform: 'ios' }).featureGraphic, undefined);
+  cfg.featureGraphic = { headline: { ko: '가', en: 'A' } };
+  assert.deepEqual(validateConfig(cfg), []);
+});
+
+test('featureGraphic — android가 아니면 거부한다', () => {
+  const cfg = defaultConfig({ platform: 'ios' });
+  cfg.featureGraphic = { headline: '가' };
+  const errors = validateConfig(cfg);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /featureGraphic은 platform android에서만/);
+});
+
+test('featureGraphic — 객체 아님·headline 누락·subhead 형식·빈 source를 각각 잡는다', () => {
+  const withFG = (fg) => validateConfig({ ...defaultConfig({ platform: 'android' }), featureGraphic: fg });
+  assert.match(withFG('x')[0], /featureGraphic은 객체/);
+  assert.match(withFG({})[0], /featureGraphic\.headline/);
+  assert.match(withFG({ headline: '가', subhead: 3 })[0], /featureGraphic\.subhead/);
+  assert.match(withFG({ headline: '가', source: '' })[0], /featureGraphic\.source/);
+  assert.match(withFG({ headline: '가', source: 1 })[0], /featureGraphic\.source/);
+});

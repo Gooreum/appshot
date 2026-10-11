@@ -20,6 +20,7 @@
  *   tabletSlot     — 조건부 필수(iPad 앱이면 13"). status가 iPad 폴더 유무/config 기기/--ipad로 판정한다
  *   totalMin       — 기기 유형을 합친 최소 장수 (Play)
  *   recommendMin   — 추천 영역 노출에 필요한 장수 (Play)
+ *   featureGraphic — 로케일마다 피처 그래픽(FEATURE_GRAPHIC)이 필수 (Play)
  */
 export const PLATFORMS = {
   ios: {
@@ -39,7 +40,19 @@ export const PLATFORMS = {
     requiredSlots: [],
     totalMin: 2,
     recommendMin: 4,
+    featureGraphic: true,
   },
+};
+
+/**
+ * Play 피처 그래픽 규격. 기기가 아니라 로케일당 1장인 자산이라 DEVICES에 넣지 않는다 —
+ * 넣으면 devices 목록·slot 판정·resolvePair가 전부 이것을 기기로 다룬다.
+ * 출력 위치는 {output}/{locale}/{file} (기기 폴더 옆).
+ */
+export const FEATURE_GRAPHIC = {
+  label: '피처 그래픽',
+  canvas: { w: 1024, h: 500 },
+  file: 'feature-graphic.png',
 };
 
 /** 프리뷰 축소 비율. render가 쓰고, status가 "프리뷰가 원본을 덮었는지" 판정할 때도 쓴다. */

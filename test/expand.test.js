@@ -78,3 +78,19 @@ test('스칼라 device/locale이 배열과 함께 있으면 defaultCombo는 스�
   const cfg = { ...multi(), device: 'ipad-pro-13', locale: 'en' };
   assert.deepEqual(defaultCombo(cfg), { locale: 'en', device: 'ipad-pro-13' });
 });
+
+test('featureGraphic 카피는 로케일로 확정하고 source의 {locale}을 치환한다, 번역 누락은 전체 경고', () => {
+  const cfg = {
+    ...defaultConfig({ platform: 'android' }),
+    locale: undefined,
+    locales: ['ko', 'en'],
+    featureGraphic: { headline: { ko: '가볍게', en: 'Light' }, subhead: { ko: '자동 정리' }, source: 'screens/{locale}/01.png' },
+  };
+  assert.deepEqual(validateConfig(cfg), []);
+  const { config, warnings } = expandConfig(cfg, { locale: 'en', device: cfg.device });
+  assert.deepEqual(config.featureGraphic, { headline: 'Light', subhead: '자동 정리', source: 'screens/en/01.png' });
+  const w = warnings.filter((x) => x.code === 'copy-missing');
+  assert.equal(w.length, 1);
+  assert.equal(w[0].screen, null);
+  assert.match(w[0].message, /featureGraphic\.subhead/);
+});

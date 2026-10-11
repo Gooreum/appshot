@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
-import { getDevice, PREVIEW_SCALE } from './devices.js';
+import { FEATURE_GRAPHIC, getDevice, PREVIEW_SCALE } from './devices.js';
 import { getLayout } from './layouts.js';
-import { buildHTML, BRAND_FONT_FAMILY } from './html.js';
+import { buildHTML, buildFeatureGraphicHTML, BRAND_FONT_FAMILY } from './html.js';
 import { normalizeFontFiles } from './config.js';
 import { checkAll, checkCopyArea, sizeFromBuffer, validateImage } from './quality.js';
 import { checkFrame, FrameGateError } from './frame-gate.js';
@@ -82,49 +82,9 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
       second: screen.source2 ? load(screen.source2, index) : null,
     },
   }));
-  // 배경 이미지는 장마다 같으므로 한 번만 읽는다.
-  // --placeholder는 "에셋이 아직 없다"는 뜻이라 배경이 없으면 그라디언트로 떨어지고 경고만 남긴다.
-  // 깨진 배경 파일은 placeholder여도 problems로 간다 — 앱 화면과 같은 원칙이다.
-  let background = null;
-  const bgCfg = cfg.theme.background;
-  if (bgCfg?.type === 'image') {
-    const bgFile = path.resolve(cwd, bgCfg.source ?? '');
-    if (placeholder && !fs.existsSync(bgFile)) {
-      warnings.push({
-        level: 'warn',
-        screen: null,
-        code: 'bg-missing',
-        message: `배경 이미지가 없어 기본 그라디언트로 렌더했습니다: ${bgCfg.source}`,
-      });
-    } else {
-      background = load(bgCfg.source, null);
-    }
-  }
+  const { background, fonts } = loadThemeAssets(cfg, { cwd, placeholder, warnings, load, problems });
 
-  // 브랜드 폰트 — 장마다 같으므로 한 번만 읽는다.
-  // --placeholder에서 없는 파일은 배경 이미지와 같은 원칙으로 경고만 남기고 시스템 폰트로 떨어진다.
-  const fonts = [];
-  for (const entry of normalizeFontFiles(cfg.theme.fontFile)) {
-    const file = path.resolve(cwd, entry.path);
-    if (placeholder && !fs.existsSync(file)) {
-      warnings.push({
-        level: 'warn',
-        screen: null,
-        code: 'font-missing',
-        message: `브랜드 폰트가 없어 시스템 폰트로 렌더했습니다: ${entry.path}`,
-      });
-      continue;
-    }
-    try {
-      fonts.push(readFont(entry, cwd));
-    } catch (err) {
-      if (!(err instanceof ScreenImageError)) throw err;
-      problems.set(file, { error: err, screens: ['폰트'] });
-    }
-  }
-
-  if (problems.size === 1) throw [...problems.values()][0].error; // 1개면 원래 문구 그대로
-  if (problems.size > 1) throw new Error(imageProblemsMessage([...problems.values()]));
+  throwProblems(problems);
 
   // 프리뷰는 별도 디렉터리에 쓴다 — 같은 경로를 쓰면 제출용 원본이 저해상도 파일로 덮이거나
   // 프레임 게이트 실패 시 지워진다.
@@ -206,6 +166,110 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
   if (warnings.length) onWarnings?.(warnings);
   if (gateFailed.length) throw new FrameGateError(gateFailed);
   return { results, outDir, canvas, device, preview, warnings, overview: overviewFile };
+}
+
+/**
+ * Play 피처 그래픽 1장 — {output}/{locale}/feature-graphic.png (프리뷰면 _preview 아래 축소본).
+ * cfg는 expandConfig로 펼친 단일 config. 테마(배경·폰트·카피 색)는 스크린샷과 같은 것을 쓴다.
+ *
+ * fitDevices와 프레임 게이트는 적용하지 않는다 — 세로 기기를 가로 캔버스에 넣으면 하단이 잘리는
+ * 것이 이 레이아웃의 의도라, 게이트의 "잘림" 판정이 매번 실패로 나온다.
+ */
+export async function renderFeatureGraphic(cfg, { preview = false, placeholder = false, cwd = process.cwd() } = {}) {
+  const device = getDevice(cfg.device);
+  const fg = cfg.featureGraphic;
+  const warnings = [];
+  const scale = preview ? PREVIEW_SCALE : 1;
+  const { w, h } = FEATURE_GRAPHIC.canvas;
+  const canvas = { w: Math.round(w * scale), h: Math.round(h * scale) };
+
+  const problems = new Map();
+  const load = (source, index) => {
+    const what = index === null ? '배경 이미지' : '앱 화면';
+    try {
+      return readImage(source, cwd, device, placeholder, 1, what);
+    } catch (err) {
+      if (!(err instanceof ScreenImageError)) throw err;
+      problems.set(path.resolve(cwd, source), { error: err, screens: [index === null ? '배경' : '피처 그래픽'] });
+      return null;
+    }
+  };
+  const main = fg.source ? load(fg.source, 0) : null;
+  const { background, fonts } = loadThemeAssets(cfg, { cwd, placeholder, warnings, load, problems });
+  throwProblems(problems);
+
+  const file = path.resolve(cwd, cfg.output, preview ? '_preview' : '', cfg.locale, FEATURE_GRAPHIC.file);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport: { width: canvas.w, height: canvas.h }, deviceScaleFactor: 1 });
+    await page.setContent(
+      buildFeatureGraphicHTML({ cfg, device, canvas, images: { main, background }, fonts }),
+      { waitUntil: 'load' },
+    );
+    await page.evaluate(() => document.fonts.ready);
+    if (fonts.length) await assertFontsLoaded(page, fonts);
+    await hideBakedNotch(page);
+    fs.writeFileSync(file, await page.screenshot({ type: 'png' }));
+  } finally {
+    await browser.close();
+  }
+  return { file, bytes: fs.statSync(file).size, canvas, warnings };
+}
+
+/**
+ * 배경 이미지와 브랜드 폰트 — 장마다 같으므로 한 번만 읽는다. 스크린샷과 피처 그래픽이 함께 쓴다.
+ * load는 이미지 문제를 problems에 모으는 호출자의 함수(index null = 배경)다.
+ */
+function loadThemeAssets(cfg, { cwd, placeholder, warnings, load, problems }) {
+  // 배경 이미지는 장마다 같으므로 한 번만 읽는다.
+  // --placeholder는 "에셋이 아직 없다"는 뜻이라 배경이 없으면 그라디언트로 떨어지고 경고만 남긴다.
+  // 깨진 배경 파일은 placeholder여도 problems로 간다 — 앱 화면과 같은 원칙이다.
+  let background = null;
+  const bgCfg = cfg.theme.background;
+  if (bgCfg?.type === 'image') {
+    const bgFile = path.resolve(cwd, bgCfg.source ?? '');
+    if (placeholder && !fs.existsSync(bgFile)) {
+      warnings.push({
+        level: 'warn',
+        screen: null,
+        code: 'bg-missing',
+        message: `배경 이미지가 없어 기본 그라디언트로 렌더했습니다: ${bgCfg.source}`,
+      });
+    } else {
+      background = load(bgCfg.source, null);
+    }
+  }
+
+  // 브랜드 폰트 — 장마다 같으므로 한 번만 읽는다.
+  // --placeholder에서 없는 파일은 배경 이미지와 같은 원칙으로 경고만 남기고 시스템 폰트로 떨어진다.
+  const fonts = [];
+  for (const entry of normalizeFontFiles(cfg.theme.fontFile)) {
+    const file = path.resolve(cwd, entry.path);
+    if (placeholder && !fs.existsSync(file)) {
+      warnings.push({
+        level: 'warn',
+        screen: null,
+        code: 'font-missing',
+        message: `브랜드 폰트가 없어 시스템 폰트로 렌더했습니다: ${entry.path}`,
+      });
+      continue;
+    }
+    try {
+      fonts.push(readFont(entry, cwd));
+    } catch (err) {
+      if (!(err instanceof ScreenImageError)) throw err;
+      problems.set(file, { error: err, screens: ['폰트'] });
+    }
+  }
+  return { background, fonts };
+}
+
+/** 모은 파일 문제를 던진다. 1개면 원래 문구 그대로, 여러 개면 한 번에 보여준다. */
+function throwProblems(problems) {
+  if (problems.size === 1) throw [...problems.values()][0].error;
+  if (problems.size > 1) throw new Error(imageProblemsMessage([...problems.values()]));
 }
 
 /**

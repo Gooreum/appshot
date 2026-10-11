@@ -86,6 +86,22 @@ appshot 폰 기기(`pixel-9-pro-xl` · `pixel-9` · `galaxy-s25-ultra`)는 모�
 
 appshot 태블릿(`galaxy-tab-s10`)은 `1440×2560`(9:16)으로 출력한다.
 
+### 피처 그래픽 (게시 필수)
+
+Play Console 도움말(answer/9866151): "You must provide a feature graphic to publish your store listing."
+
+| 항목 | 요건 |
+|---|---|
+| 크기 | **1024×500** 정확히 |
+| 형식 | JPEG 또는 24-bit PNG (**알파 없음**) |
+| 개수 | 스토어 등록정보(언어)마다 1장 |
+
+- 권장(필수 아님): 핵심 시각 요소는 가운데 쪽에 두고, 로고·앱 이름·대표 문구·주요 UI를 잘림 영역(가장자리)에 두지 않는다
+- 프로모션 동영상을 등록하면 자동 재생되지 않을 때 **재생 버튼이 그래픽 위에 겹쳐** 보인다
+
+appshot은 config의 `featureGraphic`으로 `{output}/{locale}/feature-graphic.png`(1024×500, 알파 없는 RGB PNG)를 만든다.
+카피는 안전 여백(`--safe-x`) 안에 두지만, 재생 버튼이 덮는 가운데 영역은 따로 비우지 않는다.
+
 ### 콘텐츠 가이드라인
 
 - 실제 앱 화면을 보여준다. 기기를 조작하는 손가락 등 사람을 넣지 않는다
@@ -122,6 +138,7 @@ Wear OS는 더 엄격해서 기기 프레임·추가 텍스트·배경이 **금�
 | 출력 해상도가 규격과 일치 | **검사** (`status`) — 프리뷰가 원본을 덮은 파일도 잡는다 |
 | 장수 범위 (iOS·Mac 1~10, Android 0~8) | **검사** (`status`) |
 | 오래된·남은 산출물 (config·소스보다 오래된 PNG, config에 없는 장, 번호 빠짐) | **검사** (`status`) — 현재 config 대상 폴더만 |
+| Play 피처 그래픽 존재·규격 (1024×500) | **자동** 생성(`render`, config `featureGraphic`) / **검사** (`status`) — 로케일마다 누락·해상도·stale |
 | 태그라인 20% | **경고** (Android) — 렌더 중 카피 띠 높이를 잰다 |
 | 금지 표현·가격 | **경고** — iOS는 순위·가격, Android는 신규·설치 유도·다운로드 수까지 |
 | 대형 화면 추가 텍스트 | **경고** (Android 태블릿) |

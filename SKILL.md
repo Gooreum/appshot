@@ -229,6 +229,10 @@ node ~/.claude/skills/appshot/bin/appshot.mjs render --preview
 node ~/.claude/skills/appshot/bin/appshot.mjs render
 ```
 
+Android config에 `featureGraphic`이 있으면 스크린샷 뒤에 로케일마다 피처 그래픽(1024×500)도 렌더한다
+(`{output}/{locale}/feature-graphic.png`, `--only`일 때는 건너뛴다). 테마 배경·폰트·카피 색을 그대로 쓰고,
+`source`가 있으면 오른쪽에 기기 1대를, 없으면 카피만 가운데에 놓는다. 이것도 Read로 열어 카피가 잘리지 않았는지 본다.
+
 **결과물을 Read 도구로 직접 열어 눈으로 확인한다.** 규격이 맞는 것과 보기 좋은 것은 다른 문제다.
 ① 먼저 outDir의 **`overview.png`**(세트 전체를 넘겨보기 줄 + 썸네일 줄로 모은 개요 시트)를 열어
 세트 단위로 점검한다 — 여러 장이 같은 구성이라 단조롭지 않은지, 카피 길이가 장마다 균형이 맞는지,
@@ -287,6 +291,8 @@ node ~/.claude/skills/appshot/bin/appshot.mjs status
 (프리뷰가 원본을 덮은 439×951 같은 파일을 잡는다), **장수가 범위 안인지**, 그리고 현재 config 대상 폴더에서는
 **config·소스보다 오래된 파일**(`stale`), **config에 없는 장**(`orphan`), **번호 빠짐**(`gap`)을 본다.
 `_preview/`와 `overview.png`는 무시한다. iPad 앱인데 iPad 폴더가 아직 없으면 `--ipad`를 붙인다.
+Android면 로케일마다 **피처 그래픽**(`{locale}/feature-graphic.png`, 1024×500 — Play 게시 필수)도 본다.
+없으면 `missing-feature-graphic` 에러다 — config에 `featureGraphic { headline, subhead?, source? }`을 넣고 `render`하면 만들어진다.
 
 **종료 코드가 0이 아니면 '제출 가능'이라고 말하지 않는다.** 에러 목록을 사용자에게 그대로 전달한 뒤
 **[D11]** "원본 재렌더 (Recommended)" / "남은 파일 정리" / "누락 기기 추가 렌더" / "그대로 둔다"를
