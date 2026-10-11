@@ -53,6 +53,7 @@ node ~/.claude/skills/appshot/bin/appshot.mjs <command>
 | D8 | 프리뷰 확인 후 | 원본 렌더 (Recommended) / 카피 수정 / 레이아웃·순서 수정 / 색·배경 수정 |
 | D9 | 품질 경고 | 고칠 경고를 multiSelect. 전부 무시도 선택지로 |
 | D10 | 게이트 실패 | 실패 원인별 수정안 (레이아웃 변경 / 배경색 변경 / 잘림 허용 등) |
+| D11 | `status` 에러 | 원본 재렌더 (Recommended) / 남은 파일 정리 / 누락 기기 추가 렌더 / 그대로 둔다 |
 
 사용자가 요청에서 이미 답을 준 지점(예: "아이폰만", "카피는 이걸로")은 묻지 않고 건너뛴다.
 
@@ -275,6 +276,22 @@ AskUserQuestion으로 묻는다. 각 선택지의 `preview`에 개요 시트에�
 깨진 소스 이미지(0바이트·잘린 파일·이미지가 아닌 파일)는 경고가 아니라 **에러로 중단**된다.
 `--placeholder`여도 자리표시자로 덮지 않는다.
 
+### 7단계 — 제출 전 점검
+
+```bash
+node ~/.claude/skills/appshot/bin/appshot.mjs status
+```
+
+원본 렌더가 끝나면 `status`로 출력 폴더 전체를 점검한다. 로케일×기기마다 **필수 슬롯이 채워졌는지**
+(iPhone 6.9"/6.5" 중 하나, iPad 앱이면 13", Mac, Play 합계 2장), **각 PNG가 제출 규격 해상도인지**
+(프리뷰가 원본을 덮은 439×951 같은 파일을 잡는다), **장수가 범위 안인지**, 그리고 현재 config 대상 폴더에서는
+**config·소스보다 오래된 파일**(`stale`), **config에 없는 장**(`orphan`), **번호 빠짐**(`gap`)을 본다.
+`_preview/`와 `overview.png`는 무시한다. iPad 앱인데 iPad 폴더가 아직 없으면 `--ipad`를 붙인다.
+
+**종료 코드가 0이 아니면 '제출 가능'이라고 말하지 않는다.** 에러 목록을 사용자에게 그대로 전달한 뒤
+**[D11]** "원본 재렌더 (Recommended)" / "남은 파일 정리" / "누락 기기 추가 렌더" / "그대로 둔다"를
+AskUserQuestion으로 묻는다. 경고(`!`)만 있으면 통과이고, 경고는 전달만 한다. `--json`으로 원본 결과를 받을 수 있다.
+
 ## 커맨드 요약
 
 ```
@@ -284,6 +301,7 @@ devices    디바이스와 스토어 규격 목록            [--platform] [--js
 layouts    레이아웃 5종 설명                     [--json]
 capture    시뮬레이터/기기/맥 창에서 화면 캡처     --platform ios|macos|android [--name] [--force]
 render     스토어 스크린샷 생성                  [--all] [--only 1,3] [--preview] [--placeholder] [--allow-crop] [--no-overview]
+status     제출 전 점검 (필수 슬롯·해상도·장수·오래된 파일) [--json] [--ipad]
 ```
 
 ## 참고 문서
