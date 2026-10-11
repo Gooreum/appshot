@@ -5,6 +5,16 @@ import { LAYOUT_IDS } from './layouts.js';
 
 export const CONFIG_NAME = 'appshot.config.json';
 
+/** theme.fontFile로 받는 폰트 파일 확장자. 브라우저가 data URI로 바로 읽는 형식만. */
+export const FONT_EXTS = ['.ttf', '.otf', '.woff', '.woff2'];
+
+/** theme.fontFile을 [{ path, weight }] 로 정규화한다. 문자열이면 weight 없는 항목 1개. */
+export function normalizeFontFiles(fontFile) {
+  if (fontFile === undefined || fontFile === null) return [];
+  if (typeof fontFile === 'string') return [{ path: fontFile, weight: null }];
+  return Array.isArray(fontFile) ? fontFile.map((e) => ({ path: e?.path, weight: e?.weight ?? null })) : [];
+}
+
 /** 시스템 폰트만 쓴다 — 렌더가 네트워크에 의존하면 결과가 재현되지 않는다. */
 const FONT_STACK =
   "-apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo', 'Segoe UI', Roboto, sans-serif";
@@ -158,9 +168,40 @@ export function validateConfig(cfg) {
     if (t.deviceFrame !== undefined && typeof t.deviceFrame !== 'boolean') {
       push('theme.deviceFrame은 true/false여야 합니다.');
     }
+    if (t.fontFile !== undefined) validateFontFile(t.fontFile, push);
   }
 
   return errors;
+}
+
+/**
+ * theme.fontFile 형태 검사 — 문자열(경로) 또는 { path, weight }[].
+ * 파일 존재 여부는 여기서 보지 않는다. validateConfig는 cwd 없이 도는 순수 함수이고,
+ * 이미지와 마찬가지로 파일 확인은 render.js가 맡는다.
+ */
+function validateFontFile(v, push) {
+  const at = 'theme.fontFile';
+  if (typeof v === 'string') {
+    if (!v.trim()) return push(`${at}이 비어 있습니다. 폰트 파일 경로를 지정하세요.`);
+    return checkFontExt(v, at, push);
+  }
+  if (!Array.isArray(v)) return push(`${at}은 문자열(경로) 또는 { path, weight } 배열이어야 합니다.`);
+  if (v.length === 0) return push(`${at}이 빈 배열입니다.`);
+  const seen = new Set();
+  v.forEach((e, i) => {
+    const ei = `${at}[${i}]`;
+    if (!e || typeof e !== 'object') return push(`${ei}가 객체가 아닙니다. 예: { "path": "fonts/Brand.ttf", "weight": 700 }`);
+    if (typeof e.path !== 'string' || !e.path.trim()) push(`${ei}.path가 비어 있습니다.`);
+    else checkFontExt(e.path, `${ei}.path`, push);
+    if (!Number.isInteger(e.weight) || e.weight < 1 || e.weight > 1000) push(`${ei}.weight는 1~1000 사이 정수여야 합니다.`);
+    else if (seen.has(e.weight)) push(`${at}에 weight ${e.weight}이 중복됩니다.`);
+    else seen.add(e.weight);
+  });
+}
+
+function checkFontExt(p, at, push) {
+  const ext = path.extname(p).toLowerCase();
+  if (!FONT_EXTS.includes(ext)) push(`${at} 확장자가 지원되지 않습니다: '${p}' (사용 가능: ${FONT_EXTS.join(', ')})`);
 }
 
 export function configPath(cwd = process.cwd()) {
