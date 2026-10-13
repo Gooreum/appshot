@@ -4,7 +4,7 @@ import { DEVICES, FEATURE_GRAPHIC, PLATFORMS, PREVIEW_SCALE, canvasLabel } from 
 import { imageSize } from './quality.js';
 import { listCombos, expandConfig } from './expand.js';
 import { OVERVIEW_FILE } from './overview.js';
-import { configPath } from './config.js';
+import { configPath, normalizeFontFiles } from './config.js';
 
 /*
  * 제출 전 점검 — 출력 폴더가 스토어 제출 요건을 채웠는지 읽기만 하고 판정한다.
@@ -194,7 +194,8 @@ function checkCounts(n, device, platform, where, add) {
 function checkCurrent(shots, config, where, cwd, add) {
   const N = config.screens.length;
   const abs = (p) => (p ? path.resolve(cwd, p) : null);
-  const base = Math.max(mtimeOf(configPath(cwd)), mtimeOf(abs(config.theme?.background?.source)));
+  const fontMtimes = normalizeFontFiles(config.theme?.fontFile).map((f) => mtimeOf(abs(f.path)));
+  const base = Math.max(mtimeOf(configPath(cwd)), mtimeOf(abs(config.theme?.background?.source)), ...fontMtimes);
   for (const e of shots) {
     const at = { ...where, file: e.name };
     if (e.index > N) {
@@ -222,8 +223,10 @@ function checkFeatureGraphic(entry, config, where, cwd, add) {
   checkSizes([entry], FEATURE_GRAPHIC, where, add); // canvas만 보므로 기기 대신 규격을 넘긴다
   if (!config) return;
   const abs = (p) => (p ? path.resolve(cwd, p) : null);
+  const fontMtimes = normalizeFontFiles(config.theme?.fontFile).map((f) => mtimeOf(abs(f.path)));
   const latest = Math.max(
     mtimeOf(configPath(cwd)), mtimeOf(abs(config.theme?.background?.source)), mtimeOf(abs(config.featureGraphic?.source)),
+    ...fontMtimes,
   );
   if (latest > entry.mtimeMs) add('error', 'stale', at, "소스 또는 config가 결과보다 나중에 수정됐습니다 → 'appshot render'로 재렌더");
 }
