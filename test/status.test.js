@@ -120,6 +120,19 @@ test('오래된 파일: 소스가 결과보다 나중이면 현재 config 폴더
   assert.ok(codes(r).includes('not-current'));
 });
 
+test('오래된 파일: 브랜드 폰트(theme.fontFile)가 결과보다 나중이면 stale — 피처 그래픽 포함', () => {
+  const cfg = defaultConfig({ platform: 'android' });
+  cfg.theme.fontFile = [{ path: 'fonts/Brand-Bold.ttf', weight: 700 }];
+  const shots = { 'ko/pixel-9-pro-xl': [PIXEL, PIXEL, PIXEL, PIXEL] };
+  const { cwd, t0 } = project(cfg, shots, { featureGraphics: { ko: FEATURE }, files: { 'fonts/Brand-Bold.ttf': 'font' } });
+  fs.utimesSync(path.join(cwd, 'fonts/Brand-Bold.ttf'), t0 - 50, t0 - 50);
+  assert.ok(!codes(run(cwd, cfg)).includes('stale'));
+  fs.utimesSync(path.join(cwd, 'fonts/Brand-Bold.ttf'), t0 + 10, t0 + 10);
+  const stale = run(cwd, cfg).problems.filter((x) => x.code === 'stale');
+  assert.equal(stale.length, 5); // 01~04.png와 feature-graphic.png
+  assert.ok(stale.some((x) => x.file === 'feature-graphic.png'));
+});
+
 test('남은 파일·번호 빠짐: 05.png는 orphan, 02 없음은 gap 에러', () => {
   const cfg = ios();
   const { cwd } = project(cfg, { 'ko/iphone-17-pro-max': [IPHONE, null, IPHONE, null, IPHONE] });
