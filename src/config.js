@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DEVICES, PLATFORMS, getDevice } from './devices.js';
 import { LAYOUT_IDS } from './layouts.js';
+import { listCombos } from './expand.js';
 
 export const CONFIG_NAME = 'appshot.config.json';
 
@@ -29,11 +30,17 @@ const FONT_STACK =
  * macOS를 더하면서 e2e가 이걸 잡았다.
  */
 export function defaultConfig(opts = {}) {
-  const { platform, device } = resolvePair(opts);
+  // devices/locales 배열을 주면 다중 모드 — 스칼라 device/locale 대신 배열을 넣는다.
+  // 스칼라를 남기면 defaultCombo가 그것을 쓰고 배열 안에 있는지도 따로 맞춰야 해서 겹친다.
+  const multi = resolveTargets(opts);
+  const { platform, device } = multi ?? resolvePair(opts);
+  const head = multi
+    ? { platform, devices: multi.devices, locales: multi.locales }
+    : { platform, device, locale: 'ko' };
+  // 다중 모드는 카피를 로케일 맵으로, 소스를 screens/{locale}/{device}/ 토큰 경로로 바꾼다
+  const shape = multi ? (s) => localize(s, multi.locales) : (s) => ({ ...s });
   return {
-    platform,
-    device,
-    locale: 'ko',
+    ...head,
     output: './store-screenshots',
     theme: {
       background: {
@@ -55,10 +62,42 @@ export function defaultConfig(opts = {}) {
     // Play 추천 영역에 노출되려면 스크린샷이 4장 이상이어야 한다
     // 호출마다 새 객체 — 반환된 config를 고쳐도 다음 기본값에 번지지 않게
     screens: (platform === 'android' ? [...BASE_SCREENS, ANDROID_EXTRA_SCREEN] : BASE_SCREENS)
-      .map((s) => ({ ...s })),
+      .map(shape),
     // Play는 피처 그래픽(1024×500)이 필수다 — 기본값에 넣어 두면 init 직후 render 한 번으로 갖춰진다
-    ...(PLATFORMS[platform].featureGraphic ? { featureGraphic: { ...ANDROID_FEATURE_GRAPHIC } } : {}),
+    ...(PLATFORMS[platform].featureGraphic ? { featureGraphic: shape(ANDROID_FEATURE_GRAPHIC) } : {}),
   };
+}
+
+/** init/capture가 받는 로케일 id 형식. 경로 조각으로 쓰이므로 '/'·'..' 같은 문자를 막는다. */
+export const LOCALE_ID = /^[A-Za-z0-9_-]+$/;
+
+/** 기본 카피가 준비된 로케일. 나머지 로케일은 en 문구로 채우고 init이 '번역 필요'로 짚는다. */
+export const COPY_LOCALES = ['ko', 'en'];
+
+/** 기본 카피(ko)의 영어 문구. 다중 모드 init이 로케일 맵을 만들 때 쓴다. */
+const EN_COPY = {
+  '3초 만에 기록': 'Log in 3 seconds',
+  '복잡한 설정 없이 바로 시작하세요': 'Start right away, no setup needed',
+  '한눈에 보는 흐름': 'See your flow at a glance',
+  '쌓인 기록이 자동으로 정리됩니다': 'Your entries organize themselves',
+  '어디서든 이어보기': 'Pick up anywhere',
+  '모든 기기에서 실시간으로 동기화': 'Real-time sync across all your devices',
+  '오늘부터 가볍게': 'Start light, starting today',
+  '기록은 짧게, 정리는 자동으로': 'Log briefly, organize automatically',
+  '3초 만에 기록하고 한눈에 보세요': 'Log in 3 seconds, see it all at a glance',
+};
+
+/** ko는 ko 문구, en은 en 문구, 그 밖의 로케일은 en 문구 — 맵이 비지 않고 locales 밖의 키도 없다. */
+export function copyMap(ko, en, locales) {
+  return Object.fromEntries(locales.map((l) => [l, l === 'ko' ? ko : en]));
+}
+
+function localize(s, locales) {
+  const out = { ...s };
+  if (typeof s.source === 'string') out.source = s.source.replace(/^screens\//, 'screens/{locale}/{device}/');
+  out.headline = copyMap(s.headline, EN_COPY[s.headline], locales);
+  if (s.subhead !== undefined) out.subhead = copyMap(s.subhead, EN_COPY[s.subhead], locales);
+  return out;
 }
 
 const BASE_SCREENS = [
@@ -294,22 +333,80 @@ export function loadConfig(cwd = process.cwd()) {
 /**
  * 대상 프로젝트에 config와 screens/를 만든다.
  * 여기서 만드는 것은 이 둘뿐이다 — 의존성은 스킬 폴더에 격리되어 있다.
+ * devices/locales를 주면 다중 config와 조합마다 screens/<locale>/<device>/ 폴더를 만든다.
  */
-export function scaffold(cwd, { platform, device, force = false } = {}) {
-  const resolved = resolvePair({ platform, device });
+export function scaffold(cwd, { platform, device, devices, locales, force = false } = {}) {
+  const multi = resolveTargets({ platform, device, devices, locales });
+  const resolved = multi ?? resolvePair({ platform, device });
   const file = configPath(cwd);
 
   if (fs.existsSync(file) && !force) {
     return { ok: false, reason: 'exists', file };
   }
 
-  const cfg = defaultConfig(resolved);
+  const cfg = multi ? defaultConfig(multi) : defaultConfig(resolved);
+  if (multi) {
+    // 기본값이 스스로 검증에 걸리면 init 직후 render가 실패한다 — 쓰기 전에 막는다
+    const errors = validateConfig(cfg);
+    if (errors.length) throw new Error(`생성한 config가 검증에 실패했습니다:\n  - ${errors.join('\n  - ')}`);
+  }
   fs.writeFileSync(file, `${JSON.stringify(cfg, null, 2)}\n`, 'utf8');
 
   const screensDir = path.join(cwd, 'screens');
   fs.mkdirSync(screensDir, { recursive: true });
 
-  return { ok: true, file, screensDir, config: cfg, device: DEVICES[resolved.device] };
+  if (!multi) return { ok: true, file, screensDir, config: cfg, device: DEVICES[resolved.device] };
+
+  const combos = listCombos(cfg);
+  const dirs = combos.map(({ locale, device: id }) => path.join(screensDir, locale, id));
+  for (const dir of dirs) fs.mkdirSync(dir, { recursive: true });
+  return {
+    ok: true, file, screensDir, config: cfg, combos, dirs,
+    devices: cfg.devices.map((id) => ({ id, ...DEVICES[id] })),
+    untranslated: cfg.locales.filter((l) => !COPY_LOCALES.includes(l)),
+  };
+}
+
+/**
+ * init의 다중 구성 인자(devices/locales 배열)를 정리한다. 둘 다 없으면 null(단일 모드).
+ * 한쪽만 주면 다른 쪽은 1개짜리 배열 — 기기는 --device 또는 플랫폼 필수 기기, 로케일은 ['ko'].
+ */
+export function resolveTargets({ platform, device, devices, locales }) {
+  if (devices === undefined && locales === undefined) return null;
+  if (device && devices !== undefined) throw new Error('--device와 --devices는 둘 중 하나만 쓰세요.');
+
+  let ids;
+  let p = platform;
+  if (devices !== undefined) {
+    ids = checkTargetList(devices, '--devices');
+    for (const id of ids) {
+      const d = getDevice(id); // 미지원 id면 후보를 담아 throw
+      if (p && d.platform !== p) {
+        throw platform
+          ? new Error(`device '${id}'는 ${d.platform} 기기인데 --platform ${platform}이 지정되었습니다.`)
+          : new Error(`플랫폼이 다른 기기가 섞여 있습니다: '${ids[0]}'(${p}) / '${id}'(${d.platform}). 플랫폼이 다르면 config를 나누세요.`);
+      }
+      p = d.platform;
+    }
+  } else {
+    const pair = resolvePair({ platform, device });
+    p = pair.platform;
+    ids = [pair.device];
+  }
+
+  const locs = locales === undefined ? ['ko'] : checkTargetList(locales, '--locales');
+  const bad = locs.find((l) => !LOCALE_ID.test(l));
+  if (bad !== undefined) throw new Error(`로케일 '${bad}'에 쓸 수 없는 문자가 있습니다. 영문·숫자·-·_만 씁니다 (예: ko, en, zh-Hant).`);
+
+  return { platform: p, devices: ids, locales: locs };
+}
+
+function checkTargetList(v, flag) {
+  if (!Array.isArray(v) || v.length === 0) throw new Error(`${flag}에 쉼표로 구분한 목록을 지정하세요. 예: ${flag} ${flag === '--locales' ? 'ko,en' : 'iphone-17-pro-max,ipad-pro-13'}`);
+  if (v.some((x) => typeof x !== 'string' || !x.trim())) throw new Error(`${flag}에 빈 값이 있습니다.`);
+  const dup = v.find((x, i) => v.indexOf(x) !== i);
+  if (dup !== undefined) throw new Error(`${flag}에 '${dup}'가 중복됩니다.`);
+  return v;
 }
 
 /**

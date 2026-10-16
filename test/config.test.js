@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { defaultConfig, validateConfig, normalizeFontFiles } from '../src/config.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { defaultConfig, validateConfig, normalizeFontFiles, resolveTargets, scaffold, copyMap } from '../src/config.js';
+import { expandConfig } from '../src/expand.js';
 
 const withFont = (fontFile) => {
   const cfg = defaultConfig({ platform: 'ios' });
@@ -117,4 +121,89 @@ test('featureGraphic — 객체 아님·headline 누락·subhead 형식·빈 sou
   assert.match(withFG({ headline: '가', subhead: 3 })[0], /featureGraphic\.subhead/);
   assert.match(withFG({ headline: '가', source: '' })[0], /featureGraphic\.source/);
   assert.match(withFG({ headline: '가', source: 1 })[0], /featureGraphic\.source/);
+});
+
+const IOS_MULTI = { devices: ['iphone-17-pro-max', 'ipad-pro-13'], locales: ['ko', 'en'] };
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'appshot-init-'));
+
+test('다중 defaultConfig — 플랫폼마다 검증을 통과하고 스칼라 device/locale이 없다', () => {
+  const cases = [
+    IOS_MULTI,
+    { devices: ['mac-16-10'], locales: ['ko', 'en'] },
+    { devices: ['pixel-9-pro-xl', 'galaxy-tab-s10'], locales: ['ko', 'en', 'ja'] },
+  ];
+  for (const opts of cases) {
+    const cfg = defaultConfig(opts);
+    assert.deepEqual(validateConfig(cfg), [], opts.devices.join());
+    assert.deepEqual(cfg.devices, opts.devices);
+    assert.deepEqual(cfg.locales, opts.locales);
+    assert.equal(cfg.device, undefined);
+    assert.equal(cfg.locale, undefined);
+    for (const s of cfg.screens) assert.match(s.source, /^screens\/\{locale\}\/\{device\}\/\d{2}\.png$/);
+  }
+});
+
+test('다중 defaultConfig — 카피는 로케일 맵, ko/en 외 로케일은 en 문구로 채운다', () => {
+  const cfg = defaultConfig({ devices: ['pixel-9'], locales: ['ko', 'en', 'ja'] });
+  assert.deepEqual(cfg.screens[0].headline, { ko: '3초 만에 기록', en: 'Log in 3 seconds', ja: 'Log in 3 seconds' });
+  for (const s of cfg.screens) {
+    for (const v of [s.headline, s.subhead]) {
+      assert.deepEqual(Object.keys(v), ['ko', 'en', 'ja']);
+      assert.ok(Object.values(v).every((x) => typeof x === 'string' && x));
+    }
+  }
+  assert.equal(cfg.featureGraphic.source, 'screens/{locale}/{device}/01.png');
+  assert.equal(cfg.featureGraphic.headline.en, 'Log briefly, organize automatically');
+  assert.deepEqual(copyMap('가', 'A', ['en', 'ko']), { en: 'A', ko: '가' });
+});
+
+test('단일 defaultConfig는 다중 플래그가 없으면 그대로다 (스칼라 device/locale, 평면 screens/)', () => {
+  const cfg = defaultConfig({ platform: 'ios' });
+  assert.deepEqual(Object.keys(cfg).slice(0, 3), ['platform', 'device', 'locale']);
+  assert.equal(cfg.locale, 'ko');
+  assert.equal(cfg.screens[0].source, 'screens/01.png');
+  assert.equal(cfg.screens[0].headline, '3초 만에 기록');
+  assert.equal(resolveTargets({ platform: 'ios' }), null);
+});
+
+test('resolveTargets — 한쪽만 주면 다른 쪽은 1개짜리 배열', () => {
+  assert.deepEqual(resolveTargets({ locales: ['ko', 'en'] }), { platform: 'ios', devices: ['iphone-17-pro-max'], locales: ['ko', 'en'] });
+  assert.deepEqual(resolveTargets({ platform: 'android', locales: ['en'] }).devices, ['pixel-9-pro-xl']);
+  assert.deepEqual(resolveTargets({ device: 'ipad-pro-13', locales: ['ko'] }).devices, ['ipad-pro-13']);
+  assert.deepEqual(resolveTargets({ devices: ['pixel-9'] }), { platform: 'android', devices: ['pixel-9'], locales: ['ko'] });
+});
+
+test('resolveTargets — 플래그 충돌·플랫폼 혼합·알 수 없는 기기·잘못된 로케일을 거부한다', () => {
+  assert.throws(() => resolveTargets({ device: 'pixel-9', devices: ['pixel-9'] }), /둘 중 하나만/);
+  assert.throws(() => resolveTargets({ devices: ['iphone-17-pro-max', 'pixel-9'] }), /config를 나누세요/);
+  assert.throws(() => resolveTargets({ platform: 'android', devices: ['ipad-pro-13'] }), /--platform android/);
+  assert.throws(() => resolveTargets({ devices: ['nope'] }), /알 수 없는 디바이스/);
+  assert.throws(() => resolveTargets({ devices: [] }), /쉼표로 구분한 목록/);
+  assert.throws(() => resolveTargets({ locales: ['ko', 'ko'] }), /중복/);
+  assert.throws(() => resolveTargets({ locales: ['../x'] }), /쓸 수 없는 문자/);
+  assert.throws(() => resolveTargets({ locales: ['ko/en'] }), /쓸 수 없는 문자/);
+  assert.doesNotThrow(() => resolveTargets({ locales: ['zh-Hant', 'pt_BR'] }));
+});
+
+test('scaffold 다중 모드 — 조합마다 폴더를 만들고, 펼친 source 경로의 폴더가 실제로 있다', () => {
+  const cwd = tmp();
+  const r = scaffold(cwd, IOS_MULTI);
+  assert.equal(r.ok, true);
+  assert.equal(r.combos.length, 4);
+  assert.deepEqual(r.untranslated, []);
+  for (const combo of r.combos) {
+    const { config, warnings } = expandConfig(r.config, combo);
+    assert.deepEqual(warnings, []);
+    for (const s of config.screens) assert.ok(fs.statSync(path.dirname(path.join(cwd, s.source))).isDirectory(), s.source);
+  }
+  assert.deepEqual(JSON.parse(fs.readFileSync(r.file, 'utf8')), r.config);
+  assert.equal(scaffold(cwd, IOS_MULTI).reason, 'exists');
+  assert.equal(scaffold(cwd, { ...IOS_MULTI, force: true }).ok, true);
+});
+
+test('scaffold 단일 모드 — 반환값과 폴더가 이전과 같다', () => {
+  const cwd = tmp();
+  const r = scaffold(cwd, { platform: 'ios' });
+  assert.deepEqual(Object.keys(r), ['ok', 'file', 'screensDir', 'config', 'device']);
+  assert.deepEqual(fs.readdirSync(path.join(cwd, 'screens')), []);
 });

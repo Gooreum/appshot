@@ -204,7 +204,9 @@ APPSHOT="node ~/Code/appshot/bin/appshot.mjs"
 $APPSHOT doctor                           # Playwright·Chromium·simctl·adb·screencapture 점검
 $APPSHOT devices --platform ios           # 기기와 스토어 규격, 필수 슬롯
 $APPSHOT init --device iphone-17-pro-max  # appshot.config.json + screens/ 생성
+$APPSHOT init --devices iphone-17-pro-max,ipad-pro-13 --locales ko,en  # 다중 구성 + screens/<locale>/<device>/
 $APPSHOT capture --platform ios           # 부팅된 시뮬레이터에서 상태바 정리 후 캡처
+$APPSHOT capture --locale ko --device ipad-pro-13  # screens/ko/ipad-pro-13/NN.png에 저장
 $APPSHOT layouts                          # 레이아웃 5종 설명
 $APPSHOT render --preview                 # 1/3 해상도로 빠르게 확인
 $APPSHOT render                           # 제출용 원본
@@ -271,6 +273,20 @@ Google Play는 스크린샷 외에 **피처 그래픽(1024×500)이 있어야 �
 로케일을 추가할 때마다, 기기 슬롯마다 config를 복사하지 않는다. config 하나에 `devices`·`locales` 배열을 적고
 카피를 로케일별 맵으로 쓰면 `render --all`이 모든 조합을 `{output}/{locale}/{device}/`에 렌더한다.
 카피와 테마가 한 곳에 있으니 고치면 모든 조합에 반영된다.
+
+**init으로 시작하기** — 빈 디렉토리에서 한 번에 다중 구성을 만든다:
+
+```bash
+$APPSHOT init --devices iphone-17-pro-max,ipad-pro-13 --locales ko,en
+```
+
+- 아래 모양의 config(`devices`·`locales` 배열, 로케일별 카피 맵, `screens/{locale}/{device}/NN.png` 소스)와
+  조합마다 `screens/ko/iphone-17-pro-max/` 같은 폴더를 만든다. 폴더에 PNG를 넣으면 config를 고치지 않고 `render --all`로 넘어간다
+- 한쪽만 줘도 된다. `--locales ko,en`만 주면 기기는 `--device` 값(없으면 플랫폼 필수 기기) 1개, `--devices`만 주면 로케일은 `ko` 1개
+- 기본 카피는 ko·en 두 벌이다. 그 밖의 로케일(`ja` 등)은 en 문구로 채우고 init 안내에 "번역 필요"로 표시한다
+- 로케일 id는 영문·숫자·`-`·`_`만 쓴다(`zh-Hant`, `pt_BR`). `--device`와 `--devices`는 같이 쓰지 않는다
+- 캡처는 `capture --locale ko --device ipad-pro-13`으로 해당 폴더의 다음 빈 번호에 저장한다.
+  config에 한 값뿐인 축은 생략할 수 있다. 찍힌 화면이 그 기기인지는 확인하지 않으니 시뮬레이터를 맞춰 두고 찍는다
 
 ```json
 {
