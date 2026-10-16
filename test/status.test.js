@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { scanOutput, scanFeatureGraphics, evaluate } from '../src/status.js';
 import { defaultConfig } from '../src/config.js';
+import { PLACEHOLDER_MARKER } from '../src/placeholder-marker.js';
 
 /** PNG 시그니처 + IHDR만 있는 33바이트 가짜 PNG. sizeFromBuffer가 폭·높이를 읽는 데 충분하다. */
 function fakePNG(w, h) {
@@ -25,8 +26,9 @@ const FEATURE = [1024, 500];
 /**
  * 임시 프로젝트. shots: { 'ko/iphone-17-pro-max': [[w,h], ...] }  (index = 배열 순서, null이면 빈 번호)
  * featureGraphics: { ko: [w,h] } — {output}/{locale}/feature-graphic.png
+ * markers: { 'ko/iphone-17-pro-max': { '03.png': ['screen'] } | '문자열(그대로 기록)' } — 자리표시자 표시
  */
-function project(cfg, shots, { files = {}, mtimeShift = 0, featureGraphics = {} } = {}) {
+function project(cfg, shots, { files = {}, mtimeShift = 0, featureGraphics = {}, markers = {} } = {}) {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'appshot-status-'));
   const t0 = Date.now() / 1000 - 1000; // 결과물 기준 시각(초)
   fs.writeFileSync(path.join(cwd, 'appshot.config.json'), JSON.stringify(cfg));
@@ -53,6 +55,11 @@ function project(cfg, shots, { files = {}, mtimeShift = 0, featureGraphics = {} 
     fs.mkdirSync(path.dirname(f), { recursive: true });
     fs.writeFileSync(f, fakePNG(...wh));
     fs.utimesSync(f, t0 + mtimeShift, t0 + mtimeShift);
+  }
+  for (const [key, m] of Object.entries(markers)) {
+    const f = path.join(cwd, cfg.output, key, PLACEHOLDER_MARKER);
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, typeof m === 'string' ? m : JSON.stringify({ version: 1, files: m }));
   }
   for (const [rel, content] of Object.entries(files)) {
     const f = path.join(cwd, rel);
@@ -222,4 +229,53 @@ test('피처 그래픽: iOS는 판정하지 않는다', () => {
   const r = run(project(cfg, { 'ko/iphone-17-pro-max': [IPHONE, IPHONE, IPHONE] }).cwd, cfg);
   assert.equal(r.ok, true, JSON.stringify(r.problems));
   assert.ok(!r.rows.some((x) => x.device === 'feature-graphic'));
+});
+
+test('자리표시자: 표시가 남은 장은 placeholder-render 에러, 표시가 없으면 ok', () => {
+  const cfg = ios();
+  const shots = { 'ko/iphone-17-pro-max': [IPHONE, IPHONE, IPHONE] };
+  const r = run(project(cfg, shots, { markers: { 'ko/iphone-17-pro-max': { '03.png': ['screen'] } } }).cwd, cfg);
+  assert.equal(r.ok, false);
+  const p = r.problems.filter((x) => x.code === 'placeholder-render');
+  assert.equal(p.length, 1);
+  assert.deepEqual([p[0].level, p[0].locale, p[0].file], ['error', 'ko', '03.png']);
+  assert.match(p[0].message, /자리표시자 화면/);
+  assert.equal(r.rows[0].errors, 1);
+  assert.ok(!codes(r).includes('unknown-entry')); // 표시 파일 자체는 경고 대상이 아니다
+
+  const cleared = run(project(cfg, shots, { markers: { 'ko/iphone-17-pro-max': {} } }).cwd, cfg);
+  assert.equal(cleared.ok, true, JSON.stringify(cleared.problems));
+});
+
+test('자리표시자: config 대상이 아닌 폴더도 판정하고, _preview는 무시한다', () => {
+  const cfg = ios();
+  const shots = { 'ko/iphone-17-pro-max': [IPHONE, IPHONE, IPHONE], 'en/iphone-17-pro-max': [IPHONE, IPHONE, IPHONE], '_preview/ko/iphone-17-pro-max': [[439, 951]] };
+  const r = run(project(cfg, shots, {
+    markers: { 'en/iphone-17-pro-max': { '01.png': ['screen'] }, '_preview/ko/iphone-17-pro-max': { '01.png': ['screen'] } },
+  }).cwd, cfg);
+  const p = r.problems.filter((x) => x.code === 'placeholder-render');
+  assert.equal(p.length, 1);
+  assert.equal(p[0].locale, 'en');
+});
+
+test('자리표시자: 깨진 표시는 폴더 전체를 에러로, PNG가 없는 항목은 무시한다', () => {
+  const cfg = ios();
+  const shots = { 'ko/iphone-17-pro-max': [IPHONE, IPHONE, IPHONE] };
+  const broken = run(project(cfg, shots, { markers: { 'ko/iphone-17-pro-max': '{not json' } }).cwd, cfg);
+  assert.deepEqual(broken.problems.filter((x) => x.code === 'placeholder-render').map((x) => x.file), ['01.png', '02.png', '03.png']);
+  assert.match(broken.problems.find((x) => x.code === 'placeholder-render').message, /깨져/);
+
+  const ghost = run(project(cfg, shots, { markers: { 'ko/iphone-17-pro-max': { '07.png': ['screen'] } } }).cwd, cfg);
+  assert.equal(ghost.ok, true, JSON.stringify(ghost.problems));
+});
+
+test('자리표시자: 피처 그래픽의 배경 대체도 에러', () => {
+  const cfg = defaultConfig({ platform: 'android' });
+  const shots = { 'ko/pixel-9-pro-xl': [PIXEL, PIXEL, PIXEL, PIXEL] };
+  const r = run(project(cfg, shots, { featureGraphics: { ko: FEATURE }, markers: { ko: { 'feature-graphic.png': ['background'] } } }).cwd, cfg);
+  const p = r.problems.filter((x) => x.code === 'placeholder-render');
+  assert.equal(p.length, 1);
+  assert.deepEqual([p[0].locale, p[0].file], ['ko', 'feature-graphic.png']);
+  assert.match(p[0].message, /배경 이미지/);
+  assert.equal(r.rows.find((x) => x.device === 'feature-graphic').errors, 1);
 });

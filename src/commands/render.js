@@ -65,7 +65,8 @@ export async function run({ opts }) {
       try {
         const r = await renderFeatureGraphic(config, { preview, placeholder: Boolean(opts.placeholder), cwd });
         featureDone.push(label);
-        console.log(`  ${path.basename(r.file)}  ${r.canvas.w}×${r.canvas.h}  ${locale}  ${kb(r.bytes)}  — ${path.relative(cwd, r.file)}`);
+        const tag = r.placeholder.length ? '  (자리표시자 — 제출용 아님)' : '';
+        console.log(`  ${path.basename(r.file)}  ${r.canvas.w}×${r.canvas.h}  ${locale}  ${kb(r.bytes)}  — ${path.relative(cwd, r.file)}${tag}`);
       } catch (err) {
         if (!multi) throw err;
         failures.push({ label, message: err.message });
@@ -92,11 +93,15 @@ export async function run({ opts }) {
   return 0;
 }
 
-function printSummary({ results, outDir, canvas, device, overview }, cfg, cwd, preview) {
+function printSummary({ results, outDir, canvas, device, overview, placeholders }, cfg, cwd, preview) {
   const spec = `${canvas.w}×${canvas.h}`;
   console.log('');
   console.log(`  ${results.length}장 생성 — ${path.relative(cwd, outDir) || outDir}`);
   if (overview) console.log(`  개요 시트 — ${path.relative(cwd, overview)} (제출용 아님)`);
+  if (placeholders.length) {
+    const nums = placeholders.map((p) => String(p.index).padStart(2, '0')).join(', ');
+    console.log(`  ⚠ 자리표시자 ${placeholders.length}장(${nums}) — 제출용 아님. 실제 화면·에셋을 넣고 'appshot render'로 재렌더하세요`);
+  }
   if (preview) {
     const submitDir = path.join(cfg.output, cfg.locale, cfg.device);
     console.log(`  프리뷰 해상도 ${spec} (제출 규격은 ${canvasLabel(device)})`);
