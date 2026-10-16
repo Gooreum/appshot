@@ -95,7 +95,14 @@ node ~/.claude/skills/appshot/bin/appshot.mjs devices --platform ios
 **[D2]** 출력에서 `[필수]` 슬롯을 첫 선택지(Recommended)로 두고 AskUserQuestion으로 고르게 한다.
 iPad에서도 도는 앱이면 iPhone과 iPad를 함께 고를 수 있게 multiSelect로 묻는다.
 여럿을 고르면 config를 나누지 않는다 — `device` 대신 `devices: ["iphone-17-pro-max", "ipad-pro-13"]` 배열로 적고
-`render --all`로 한 번에 렌더한다 (아래 '주의' 참고).
+`render --all`로 한 번에 렌더한다 (아래 '주의' 참고). 손으로 쓰지 말고 init으로 만든다:
+
+```bash
+node ~/.claude/skills/appshot/bin/appshot.mjs init --devices iphone-17-pro-max,ipad-pro-13 --locales ko,en
+```
+
+`devices`·`locales` 배열, 로케일별 카피 맵, `screens/{locale}/{device}/NN.png` 소스가 든 config와
+조합마다 `screens/<locale>/<device>/` 폴더가 생긴다. 로케일이 하나여도 다른 로케일을 낼 계획이면 `--locales`를 같이 준다.
 
 - App Store는 **iPhone 6.9" 또는 6.5" 중 하나**가 필수 — 기본은 6.9"(1290×2796).
   iPad에서 도는 앱이면 **iPad 13"(2064×2752)** 도 필수
@@ -121,12 +128,14 @@ Mac도 **[D3]**으로 "창 목업 켬 (Recommended)" / "끔 — 화면만"을 �
 **[D4]** AskUserQuestion으로 고르게 한다: "가진 PNG 사용" / "시뮬레이터 자동 캡처" / "자리표시자로 먼저".
 기존 캡처 폴더가 프로젝트에 보이면 그 경로와 장수를 선택지 설명에 적는다.
 
-**(a) 사용자가 PNG를 제공** — `screens/` 폴더에 넣게 안내한다.
+**(a) 사용자가 PNG를 제공** — `screens/` 폴더에 넣게 안내한다. 다중 구성이면 `screens/<locale>/<device>/` 폴더마다 넣는다.
 
 **(b) 자동 캡처** — 시뮬레이터/기기가 켜져 있어야 한다:
 ```bash
 node ~/.claude/skills/appshot/bin/appshot.mjs capture --platform ios
 ```
+다중 구성이면 `capture --locale ko --device ipad-pro-13`처럼 조합을 지정해 그 폴더에 저장한다.
+찍힌 화면이 그 기기인지는 확인하지 않으니, 지정한 기기의 시뮬레이터가 부팅돼 있는지 먼저 확인한다.
 adb가 없으면 실패가 아니라 "PNG를 직접 넣으세요" 안내가 나온다. 그때는 **[D4]**를 다시 묻되
 자동 캡처를 빼고 (a)와 자리표시자만 선택지로 준다.
 
@@ -302,10 +311,10 @@ AskUserQuestion으로 묻는다. 경고(`!`)만 있으면 통과이고, 경고�
 
 ```
 doctor     환경 점검 (playwright / chromium / simctl / screencapture / adb)
-init       appshot.config.json + screens/ 생성   [--platform] [--device] [--force]
+init       appshot.config.json + screens/ 생성   [--platform] [--device | --devices a,b] [--locales ko,en] [--force]
 devices    디바이스와 스토어 규격 목록            [--platform] [--json]
 layouts    레이아웃 5종 설명                     [--json]
-capture    시뮬레이터/기기/맥 창에서 화면 캡처     --platform ios|macos|android [--name] [--force]
+capture    시뮬레이터/기기/맥 창에서 화면 캡처     --platform ios|macos|android [--locale] [--device] [--name] [--force]
 render     스토어 스크린샷 생성                  [--all] [--only 1,3] [--preview] [--placeholder] [--allow-crop] [--no-overview]
 status     제출 전 점검 (필수 슬롯·해상도·장수·오래된 파일) [--json] [--ipad]
 ```
@@ -321,7 +330,7 @@ status     제출 전 점검 (필수 슬롯·해상도·장수·오래된 파일
   따로 쌓이므로 제출할 때는 `_preview` 밖의 파일을 쓴다. 폴더마다 생기는 `overview.png`도 제출 대상이 아니다
 - **로케일·기기가 여럿이면 config를 복사하지 않는다.** `devices: [...]`, `locales: [...]` 배열을 적고
   `headline`/`subhead`를 `{ "ko": "...", "en": "..." }` 맵으로, 소스 경로는 `screens/{locale}/{device}/01.png`처럼
-  토큰으로 쓴다. `render --all`이 모든 조합을 돌고, 번역이 빠진 장은 기본 로케일 문구로 렌더하며 `copy-missing`
+  토큰으로 쓴다. 이 config는 `init --devices … --locales …`가 만들어 준다. `render --all`이 모든 조합을 돌고, 번역이 빠진 장은 기본 로케일 문구로 렌더하며 `copy-missing`
   경고를 낸다. `--all` 없이 `render`하면 기본 조합 하나만 렌더한다(프리뷰용). 플랫폼이 다르면(iOS + Android) config를 나눈다
 - `deviceScaleFactor: 1`로 고정되어 있어 출력 크기가 항상 규격과 1:1이다.
   이 값을 건드리면 2배 크기로 나와 스토어가 리젝한다
