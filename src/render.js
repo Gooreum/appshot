@@ -8,6 +8,7 @@ import { normalizeFontFiles } from './config.js';
 import { checkAll, checkCopyArea, sizeFromBuffer, validateImage } from './quality.js';
 import { checkFrame, FrameGateError } from './frame-gate.js';
 import { renderOverview, OVERVIEW_FILE } from './overview.js';
+import { markFile } from './placeholder-marker.js';
 
 const MIME = {
   '.png': 'image/png',
@@ -82,7 +83,7 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
       second: screen.source2 ? load(screen.source2, index) : null,
     },
   }));
-  const { background, fonts } = loadThemeAssets(cfg, { cwd, placeholder, warnings, load, problems });
+  const { background, fonts, fallbacks } = loadThemeAssets(cfg, { cwd, placeholder, warnings, load, problems });
 
   throwProblems(problems);
 
@@ -94,6 +95,7 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
   const browser = await chromium.launch();
   const results = [];
   const gateFailed = [];
+  const placeholders = []; // [{ index, reasons }] — 자리표시자가 실제로 쓰인 장
   const rendered = new Map(); // index → PNG 버퍼. 개요 시트가 다시 읽지 않게 모아 둔다
   let overviewFile = null;
 
@@ -125,8 +127,10 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
       const area = checkCopyArea(cfg, index, await copyAreaRatio(page));
       if (area) warnings.push(area);
 
-      const file = path.join(outDir, `${String(index + 1).padStart(2, '0')}.png`);
+      const name = `${String(index + 1).padStart(2, '0')}.png`;
+      const file = path.join(outDir, name);
       const png = await page.screenshot({ type: 'png' });
+      const reasons = placeholderReasons([images.main, images.second], fallbacks);
 
       // 프레임 게이트 — 기기처럼 보이지 않으면 저장하지 않는다. 이전 렌더의 같은 이름 파일도 지운다:
       // 남겨 두면 "이번 렌더가 실패했다"는 사실과 무관하게 옛 파일이 그대로 제출될 수 있다.
@@ -135,10 +139,12 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
         if (failures.length) {
           gateFailed.push({ index: index + 1, failures });
           fs.rmSync(file, { force: true });
+          markFile(outDir, name, null);
           continue;
         }
       }
-      fs.writeFileSync(file, png);
+      writeMarked(outDir, name, png, reasons);
+      if (reasons.length) placeholders.push({ index: index + 1, reasons });
       rendered.set(index, png);
 
       const stat = fs.statSync(file);
@@ -165,7 +171,7 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
 
   if (warnings.length) onWarnings?.(warnings);
   if (gateFailed.length) throw new FrameGateError(gateFailed);
-  return { results, outDir, canvas, device, preview, warnings, overview: overviewFile };
+  return { results, outDir, canvas, device, preview, warnings, overview: overviewFile, placeholders };
 }
 
 /**
@@ -195,8 +201,9 @@ export async function renderFeatureGraphic(cfg, { preview = false, placeholder =
     }
   };
   const main = fg.source ? load(fg.source, 0) : null;
-  const { background, fonts } = loadThemeAssets(cfg, { cwd, placeholder, warnings, load, problems });
+  const { background, fonts, fallbacks } = loadThemeAssets(cfg, { cwd, placeholder, warnings, load, problems });
   throwProblems(problems);
+  const reasons = placeholderReasons([main], fallbacks);
 
   const file = path.resolve(cwd, cfg.output, preview ? '_preview' : '', cfg.locale, FEATURE_GRAPHIC.file);
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -211,11 +218,11 @@ export async function renderFeatureGraphic(cfg, { preview = false, placeholder =
     await page.evaluate(() => document.fonts.ready);
     if (fonts.length) await assertFontsLoaded(page, fonts);
     await hideBakedNotch(page);
-    fs.writeFileSync(file, await page.screenshot({ type: 'png' }));
+    writeMarked(path.dirname(file), FEATURE_GRAPHIC.file, await page.screenshot({ type: 'png' }), reasons);
   } finally {
     await browser.close();
   }
-  return { file, bytes: fs.statSync(file).size, canvas, warnings };
+  return { file, bytes: fs.statSync(file).size, canvas, warnings, placeholder: reasons };
 }
 
 /**
@@ -227,6 +234,7 @@ function loadThemeAssets(cfg, { cwd, placeholder, warnings, load, problems }) {
   // --placeholder는 "에셋이 아직 없다"는 뜻이라 배경이 없으면 그라디언트로 떨어지고 경고만 남긴다.
   // 깨진 배경 파일은 placeholder여도 problems로 간다 — 앱 화면과 같은 원칙이다.
   let background = null;
+  const fallbacks = []; // 자리표시자로 떨어진 테마 에셋 — 'background' | 'font'
   const bgCfg = cfg.theme.background;
   if (bgCfg?.type === 'image') {
     const bgFile = path.resolve(cwd, bgCfg.source ?? '');
@@ -237,6 +245,7 @@ function loadThemeAssets(cfg, { cwd, placeholder, warnings, load, problems }) {
         code: 'bg-missing',
         message: `배경 이미지가 없어 기본 그라디언트로 렌더했습니다: ${bgCfg.source}`,
       });
+      fallbacks.push('background');
     } else {
       background = load(bgCfg.source, null);
     }
@@ -254,6 +263,7 @@ function loadThemeAssets(cfg, { cwd, placeholder, warnings, load, problems }) {
         code: 'font-missing',
         message: `브랜드 폰트가 없어 시스템 폰트로 렌더했습니다: ${entry.path}`,
       });
+      if (!fallbacks.includes('font')) fallbacks.push('font');
       continue;
     }
     try {
@@ -263,7 +273,22 @@ function loadThemeAssets(cfg, { cwd, placeholder, warnings, load, problems }) {
       problems.set(file, { error: err, screens: ['폰트'] });
     }
   }
-  return { background, fonts };
+  return { background, fonts, fallbacks };
+}
+
+/** 이 장이 진짜가 아닌 사유 — 앱 화면이 자리표시자면 'screen', 그 뒤에 테마 에셋 대체 사유. */
+function placeholderReasons(images, fallbacks) {
+  return [...(images.some((img) => img?.placeholder) ? ['screen'] : []), ...fallbacks];
+}
+
+/**
+ * PNG를 쓰고 자리표시자 표시를 맞춘다. 순서가 실패 방향을 정한다:
+ * 가짜면 표시를 먼저 쓰고, 진짜면 PNG를 쓴 뒤 표시를 지운다 — 중간에 죽어도 가짜가 진짜로 보이지 않는다.
+ */
+function writeMarked(dir, name, png, reasons) {
+  if (reasons.length) markFile(dir, name, reasons);
+  fs.writeFileSync(path.join(dir, name), png);
+  if (!reasons.length) markFile(dir, name, null);
 }
 
 /** 모은 파일 문제를 던진다. 1개면 원래 문구 그대로, 여러 개면 한 번에 보여준다. */
@@ -517,7 +542,7 @@ function placeholderImage(device, screenNo) {
           font-weight="600">화면 ${screenNo}</text>
   </svg>`;
   // 자리표시자는 기기 화면 비율로 그리므로 size를 따로 넘기지 않아도 된다
-  return { uri: `data:image/svg+xml,${encodeURIComponent(svg)}`, size: null };
+  return { uri: `data:image/svg+xml,${encodeURIComponent(svg)}`, size: null, placeholder: true };
 }
 
 export { PREVIEW_SCALE };

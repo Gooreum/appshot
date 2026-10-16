@@ -53,7 +53,7 @@ node ~/.claude/skills/appshot/bin/appshot.mjs <command>
 | D8 | 프리뷰 확인 후 | 원본 렌더 (Recommended) / 카피 수정 / 레이아웃·순서 수정 / 색·배경 수정 |
 | D9 | 품질 경고 | 고칠 경고를 multiSelect. 전부 무시도 선택지로 |
 | D10 | 게이트 실패 | 실패 원인별 수정안 (레이아웃 변경 / 배경색 변경 / 잘림 허용 등) |
-| D11 | `status` 에러 | 원본 재렌더 (Recommended) / 남은 파일 정리 / 누락 기기 추가 렌더 / 그대로 둔다 |
+| D11 | `status` 에러 | 원본 재렌더 (Recommended) / 남은 파일 정리 / 누락 기기 추가 렌더 / 그대로 둔다 — `placeholder-render`면 재렌더 전에 실제 화면·에셋을 받는다(D4로) |
 
 사용자가 요청에서 이미 답을 준 지점(예: "아이폰만", "카피는 이걸로")은 묻지 않고 건너뛴다.
 
@@ -151,6 +151,8 @@ Android는 demo mode로 알림을 숨기고 아이콘을 가득 채운다. 끝�
 
 **아직 앱 화면이 없어도 진행할 수 있다.** `--placeholder`로 자리표시자를 써서
 카피와 레이아웃을 먼저 확정한 뒤 나중에 실제 화면으로 교체하는 편이 대개 빠르다.
+단 자리표시자 결과는 **제출할 수 없다** — `status`가 `placeholder-render` 에러로 막는다. 실제 화면을 확보해
+`render`로 다시 뽑아야 풀린다(대체된 장만 `--only`로 다시 렌더해도 된다).
 
 ### 5단계 — 레이아웃과 카피
 
@@ -291,6 +293,8 @@ node ~/.claude/skills/appshot/bin/appshot.mjs status
 (프리뷰가 원본을 덮은 439×951 같은 파일을 잡는다), **장수가 범위 안인지**, 그리고 현재 config 대상 폴더에서는
 **config·소스보다 오래된 파일**(`stale`), **config에 없는 장**(`orphan`), **번호 빠짐**(`gap`)을 본다.
 `_preview/`와 `overview.png`는 무시한다. iPad 앱인데 iPad 폴더가 아직 없으면 `--ipad`를 붙인다.
+`--placeholder`로 앱 화면·배경 이미지·브랜드 폰트를 대체한 장은 모든 폴더에서 `placeholder-render` 에러다 —
+사용자에게 실제 화면·에셋을 요청하고(D4) 받은 뒤 `render`한다. 숨김 기록 파일 `.appshot-placeholder.json`은 손대지 않는다.
 Android면 로케일마다 **피처 그래픽**(`{locale}/feature-graphic.png`, 1024×500 — Play 게시 필수)도 본다.
 없으면 `missing-feature-graphic` 에러다 — config에 `featureGraphic { headline, subhead?, source? }`을 넣고 `render`하면 만들어진다.
 
