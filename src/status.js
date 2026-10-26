@@ -5,6 +5,7 @@ import { imageSize } from './quality.js';
 import { listCombos, expandConfig } from './expand.js';
 import { OVERVIEW_FILE } from './overview.js';
 import { configPath } from './config.js';
+import { readMarker } from './placeholder-marker.js';
 
 /*
  * 제출 전 점검 — 출력 폴더가 스토어 제출 요건을 채웠는지 읽기만 하고 판정한다.
@@ -15,6 +16,7 @@ import { configPath } from './config.js';
  *   다른 로케일·기기 폴더는 지금 config와 비교할 근거가 없어 stale을 판정하지 않는다(not-current 정보).
  * 슬롯은 storeSlot 문자열로 묶어 본다 — iPhone은 6.9"와 6.5" 중 하나면 되고, Play 폰 3종은 같은 슬롯이다.
  * Play 피처 그래픽은 기기 폴더가 아니라 {locale}/feature-graphic.png라 scanFeatureGraphics로 따로 읽는다.
+ * 자리표시자 표시(.appshot-placeholder.json)가 남은 장은 config 대상 여부와 무관하게 placeholder-render 에러다.
  */
 
 const SHOT_RE = /^(\d{2})\.(png|jpe?g)$/i;
@@ -24,7 +26,10 @@ const range = (a, b) => Array.from({ length: Math.max(0, b - a + 1) }, (_, i) =>
 const subdirs = (dir) => fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort();
 const mtimeOf = (file) => { try { return fs.statSync(file).mtimeMs; } catch { return 0; } };
 
-/** {output} 폴더를 { locale: { deviceId: [{ name, index, file, size, mtimeMs }] } } 로 읽는다. 폴더가 없으면 null. */
+/**
+ * {output} 폴더를 { locale: { deviceId: [{ name, index, file, size, mtimeMs, placeholder }] } } 로 읽는다. 폴더가 없으면 null.
+ * placeholder: 자리표시자 사유 배열 또는 null
+ */
 export function scanOutput(outRoot) {
   if (!fs.existsSync(outRoot)) return null;
   const scan = {};
@@ -33,6 +38,7 @@ export function scanOutput(outRoot) {
     scan[locale] = {};
     for (const device of subdirs(path.join(outRoot, locale))) {
       const dir = path.join(outRoot, locale, device);
+      const marker = readMarker(dir);
       scan[locale][device] = fs.readdirSync(dir)
         .filter((name) => name !== OVERVIEW_FILE && !name.startsWith('.'))
         .sort()
@@ -41,14 +47,14 @@ export function scanOutput(outRoot) {
           const m = name.match(SHOT_RE);
           let size = null;
           if (m) { try { size = imageSize(file); } catch { size = null; } }
-          return { name, index: m ? Number(m[1]) : null, file, size, mtimeMs: mtimeOf(file) };
+          return { name, index: m ? Number(m[1]) : null, file, size, mtimeMs: mtimeOf(file), placeholder: markerReasons(marker, name) };
         });
     }
   }
   return scan;
 }
 
-/** 로케일 폴더 바로 아래의 피처 그래픽을 { locale: { name, file, size, mtimeMs } | null } 로 읽는다. 폴더가 없으면 null. */
+/** 로케일 폴더 바로 아래의 피처 그래픽을 { locale: { name, file, size, mtimeMs, placeholder } | null } 로 읽는다. 폴더가 없으면 null. */
 export function scanFeatureGraphics(outRoot) {
   if (!fs.existsSync(outRoot)) return null;
   const out = {};
@@ -58,9 +64,18 @@ export function scanFeatureGraphics(outRoot) {
     if (!fs.existsSync(file)) { out[locale] = null; continue; }
     let size = null;
     try { size = imageSize(file); } catch { size = null; }
-    out[locale] = { name: FEATURE_GRAPHIC.file, file, size, mtimeMs: mtimeOf(file) };
+    out[locale] = {
+      name: FEATURE_GRAPHIC.file, file, size, mtimeMs: mtimeOf(file),
+      placeholder: markerReasons(readMarker(path.join(outRoot, locale)), FEATURE_GRAPHIC.file),
+    };
   }
   return out;
+}
+
+/** 표시에서 name의 사유. 깨진 표시('*')는 폴더의 모든 결과물에 해당한다. */
+function markerReasons(marker, name) {
+  const reasons = marker['*'] ?? marker[name];
+  return Array.isArray(reasons) && reasons.length ? reasons : null;
 }
 
 /**
@@ -110,6 +125,7 @@ export function evaluate(scan, cfg, { cwd = process.cwd(), ipad = false, feature
       const before = errorCount();
 
       checkSizes(shots, device, where, add);
+      checkPlaceholder(shots, where, add);
       checkCounts(shots.length, device, platform, where, add);
 
       const isCurrent = current.has(`${locale}/${id}`);
@@ -180,6 +196,22 @@ function checkSizes(shots, device, where, add) {
   }
 }
 
+const PLACEHOLDER_REASON = {
+  screen: '자리표시자 화면으로 만든 결과물입니다',
+  background: '배경 이미지 없이 그라디언트로 렌더했습니다',
+  font: '브랜드 폰트 없이 시스템 폰트로 렌더했습니다',
+  corrupt: '자리표시자 표시 파일이 깨져 실제 화면으로 만든 결과물인지 알 수 없습니다',
+};
+
+/** 자리표시자 — render --placeholder가 대체한 화면·에셋이 남은 장은 제출할 수 없다. */
+function checkPlaceholder(shots, where, add) {
+  for (const e of shots) {
+    if (!e.placeholder) continue;
+    const why = e.placeholder.map((r) => PLACEHOLDER_REASON[r] ?? `자리표시자로 렌더했습니다(${r})`).join(', ');
+    add('error', 'placeholder-render', { ...where, file: e.name }, `${why} → 실제 화면·에셋을 넣고 'appshot render'로 재렌더`);
+  }
+}
+
 /** 장수 — 슬롯당 범위, Play 폰 추천 노출 조건 */
 function checkCounts(n, device, platform, where, add) {
   const { shots, recommendMin, store } = platform;
@@ -220,6 +252,7 @@ function checkFeatureGraphic(entry, config, where, cwd, add) {
     return;
   }
   checkSizes([entry], FEATURE_GRAPHIC, where, add); // canvas만 보므로 기기 대신 규격을 넘긴다
+  checkPlaceholder([entry], where, add);
   if (!config) return;
   const abs = (p) => (p ? path.resolve(cwd, p) : null);
   const latest = Math.max(

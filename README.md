@@ -170,6 +170,7 @@ CSS 값이 아니라 픽셀을 재는 이유가 있다. CSS를 읽으면 내가 
 | `count-max` / `count-min` | 에러 | 슬롯당 장수가 iOS·Mac 1~10, Android 0~8을 벗어난다 |
 | `stale` / `orphan` / `gap` | 에러 | **현재 config 대상 폴더만** — config·소스보다 오래된 결과물 / `screens`보다 큰 번호 / 1~N 중 빠진 번호 |
 | `locale-missing` | 에러 | config(`devices`×`locales`) 대상 폴더가 없다 |
+| `placeholder-render` | 에러 | `render --placeholder`가 앱 화면·배경 이미지·브랜드 폰트를 대체해 만든 장이다 (스크린샷·피처 그래픽, config 대상 여부와 무관) |
 | `missing-feature-graphic` | 에러 | Android인데 로케일 폴더에 `feature-graphic.png`가 없다 (Play 게시 필수). 있으면 해상도(`size-mismatch`·`preview-size`)와 `stale`도 본다 |
 | `count-recommend` · `slot-duplicate` · `locale-diff` · `unknown-entry` | 경고 | Play 폰 4장 미만 / 같은 슬롯 폴더 중복 / 일부 로케일에만 있는 슬롯 / 알 수 없는 폴더·파일 |
 
@@ -213,6 +214,8 @@ $APPSHOT status                           # 업로드 전 점검 — 필수 슬�
 ```
 
 앱 화면이 아직 없으면 `render --placeholder`로 자리표시자를 넣어 카피와 레이아웃을 먼저 확정할 수 있다.
+자리표시자가 들어간 장은 `status`가 제출 불가(`placeholder-render`)로 판정한다. 실제 화면을 넣고 다시 `render`하면 풀린다
+(`--only 3`처럼 그 장만 다시 렌더해도 된다).
 
 렌더가 끝나면 같은 폴더에 `overview.png`가 함께 생긴다. 전체 장을 스토어에서 넘겨 보는 크기로 한 줄,
 목록 썸네일 크기(높이 300px)로 한 줄 나열한 개요 시트라서 세트의 단조로움·카피 길이 균형·썸네일 가독성을
@@ -246,6 +249,8 @@ Claude Code에서는 "앱스토어 스크린샷 만들어줘"라고 요청하면
 ```
 
 출력은 `{output}/{locale}/{device}/`로 나뉜다. `--preview`는 제출용을 덮지 않도록 `{output}/_preview/{locale}/{device}/`에 따로 쓴다.
+`--placeholder`로 대체된 장은 같은 폴더의 숨김 파일 `.appshot-placeholder.json`에 기록되고(피처 그래픽은 로케일 폴더), 실제 렌더로 다시 쓰면 지워진다.
+`status`는 이 기록을 보므로 출력 폴더를 다른 곳으로 옮기기 전에, 출력 폴더 안의 결과로 `status`를 실행한다.
 
 ### Play 피처 그래픽 — `featureGraphic`
 
