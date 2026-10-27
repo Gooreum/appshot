@@ -19,3 +19,10 @@ test('--all 은 값을 먹지 않는 boolean 플래그다', () => {
 test('--ipad 는 boolean 플래그다', () => {
   assert.equal(parseArgs(['status', '--ipad']).opts.ipad, true);
 });
+
+test('--watch 는 값을 먹지 않는 boolean 플래그다', () => {
+  const { opts, positional } = parseArgs(['render', '--watch', '1', '--only', '1,3']);
+  assert.equal(opts.watch, true);
+  assert.deepEqual(positional, ['1']);
+  assert.deepEqual(opts.only, [1, 3]);
+});

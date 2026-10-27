@@ -210,6 +210,7 @@ $APPSHOT capture --platform ios           # 부팅된 시뮬레이터에서 상�
 $APPSHOT capture --locale ko --device ipad-pro-13  # screens/ko/ipad-pro-13/NN.png에 저장
 $APPSHOT layouts                          # 레이아웃 5종 설명
 $APPSHOT render --preview                 # 1/3 해상도로 빠르게 확인
+$APPSHOT render --watch                   # 저장할 때마다 프리뷰 다시 렌더 (Ctrl+C로 종료)
 $APPSHOT render                           # 제출용 원본
 $APPSHOT render --all                     # devices × locales 조합 전부
 $APPSHOT status                           # 업로드 전 점검 — 필수 슬롯·해상도·장수·오래된 파일 (문제 있으면 exit 1)
@@ -312,6 +313,19 @@ $APPSHOT init --devices iphone-17-pro-max,ipad-pro-13 --locales ko,en
 - 조합 하나가 실패해도 나머지는 계속 렌더하고, 끝에 실패를 모아 보여준 뒤 종료 코드 1로 끝난다
 - `--all` 없이 `render`하면 기본 조합 하나(`device`·`locale` 스칼라가 있으면 그것, 없으면 각 배열의 첫 번째)만 렌더한다. 프리뷰로 빠르게 볼 때 쓴다
 - `devices`는 모두 `platform`과 같은 플랫폼이어야 한다. iOS + Android처럼 플랫폼이 다르면 config를 나눈다
+
+### 고치면서 바로 보기 — `render --watch`
+
+카피·색을 여러 번 고칠 때는 `render --watch`를 띄워 둔다. `appshot.config.json`과 config가 참조하는 파일
+(`screens[].source`·`source2`, 이미지 배경, `theme.fontFile`, `featureGraphic.source`)이 바뀌면 200ms 뒤
+기본 조합을 프리뷰로 다시 렌더하고 품질 경고를 다시 출력한다.
+
+- 출력은 항상 `{output}/_preview/` 아래다. 제출용 원본은 건드리지 않는다 — 다 고쳤으면 `appshot render`로 뽑는다
+- Chromium은 한 번만 띄워 재사용한다. 렌더 중에 또 저장하면 끝난 뒤 한 번만 다시 렌더한다
+- JSON이 깨졌거나 파일이 없으면 오류만 출력하고 감시를 이어 간다. 고쳐 저장하면 다시 렌더한다
+- config가 참조하지 않는 새 파일은 무시한다. 참조 경로는 config가 바뀔 때마다 다시 계산한다
+- `--only`·`--placeholder`·`--allow-crop`·`--no-overview`와 함께 쓸 수 있다. `--all`은 지원하지 않는다(기본 조합만)
+- Ctrl+C로 끝내면 브라우저를 닫고 exit 0으로 종료한다
 
 ### 캡처
 
