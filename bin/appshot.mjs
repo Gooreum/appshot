@@ -10,6 +10,7 @@ const COMMANDS = {
   capture: { desc: '시뮬레이터/기기에서 앱 화면 캡처 → screens/ (macOS 제외)', usage: 'appshot capture --platform ios|android [--locale <l>] [--device <id>] [--name <파일명>] [--force]' },
   render:  { desc: 'config를 읽어 스토어 스크린샷 생성',                     usage: 'appshot render [--all] [--only 1,3] [--preview] [--placeholder] [--allow-crop] [--no-overview]' },
   status:  { desc: '제출 준비 점검 (필수 슬롯·해상도·장수·오래된 파일)',        usage: 'appshot status [--json] [--ipad]' },
+  export:  { desc: '제출 준비가 된 PNG만 업로드용 폴더로 복사 (status 통과 시)',  usage: 'appshot export [--fastlane] [--ipad] [--force] [--json]' },
 };
 
 function printUsage() {
@@ -30,6 +31,7 @@ appshot — App Store / Play Store 마케팅 스크린샷 생성기
     appshot devices --platform android
     appshot render --preview
     appshot status
+    appshot export
 `);
 }
 

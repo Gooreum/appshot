@@ -175,9 +175,29 @@ CSS 값이 아니라 픽셀을 재는 이유가 있다. CSS를 읽으면 내가 
 | `count-recommend` · `slot-duplicate` · `locale-diff` · `unknown-entry` | 경고 | Play 폰 4장 미만 / 같은 슬롯 폴더 중복 / 일부 로케일에만 있는 슬롯 / 알 수 없는 폴더·파일 |
 
 에러가 하나라도 있으면 "제출 불가"와 종료 코드 1, 없으면 "제출 준비 완료"와 0이다. 경고만으로는 실패하지 않는다.
-`_preview/`와 `overview.png`는 무시한다. 다른 로케일·기기 폴더는 지금 config와 비교할 근거가 없어 `stale`을 판정하지 않는다.
+`_preview/`·`_upload/`와 `overview.png`는 무시한다. 다른 로케일·기기 폴더는 지금 config와 비교할 근거가 없어 `stale`을 판정하지 않는다.
 `stale`은 mtime으로만 본다 — git checkout이나 클라우드 동기화로 mtime이 바뀌면 빗나갈 수 있어, 메시지는 사실("나중에 수정됨")과
 해결책(재렌더)만 적는다. `--json`은 에이전트용 원본 결과다.
+
+### 업로드 폴더로 내보내기 — `appshot export`
+
+`status`가 통과하면 `export`로 바로 올릴 수 있는 폴더를 만든다. `export`는 `status`와 같은 판정을 다시 돌려
+에러가 있으면 파일을 하나도 만들지 않고 종료 코드 1로 끝난다(경고만 있으면 계속한다). 복사 대상은 `status` 표에 오른
+기기 폴더의 `NN.png`와 Play 피처 그래픽뿐이다 — `overview.png`, `_preview/`, 알 수 없는 폴더·파일은 빠진다.
+
+| 모드 | 스크린샷 | 피처 그래픽 (Android) |
+|---|---|---|
+| 기본 | `{output}/_upload/{locale}/{device}/NN.png` | `{output}/_upload/{locale}/feature-graphic.png` |
+| `--fastlane` iOS·Mac | `fastlane/screenshots/{ascLocale}/{device}-NN.png` | — |
+| `--fastlane` Android 폰 | `fastlane/metadata/android/{playLocale}/images/phoneScreenshots/NN.png` | `.../images/featureGraphic.png` |
+| `--fastlane` Android 10" 태블릿 | `.../images/tenInchScreenshots/NN.png` | — |
+
+- `_upload/`는 appshot이 소유한 폴더라 매번 지우고 새로 만든다. 지난번에 남은 장이 섞이지 않는다.
+- `--fastlane`은 대상 앱 프로젝트 루트(실행 위치)의 fastlane 기본 경로를 가정한다. `Deliverfile`·`Supplyfile`에서 경로를 바꿨다면 맞지 않는다.
+- 로케일은 스토어 코드로 바꾼다: `ko`→`ko`/`ko-KR`, `en`→`en-US`, `ja`→`ja`/`ja-JP`, `zh`→`zh-Hans`/`zh-CN` (App Store/Play).
+  `en-US`처럼 이미 지역 코드가 붙은 로케일은 그대로, 표에 없는 로케일은 그대로 쓰고 `locale-unmapped` 경고를 낸다.
+- fastlane 이미지 자리에 기존 이미지가 있으면 중단한다. `--force`면 그 자리의 이미지 파일만 지우고 바꾼다 — `title.txt` 같은 메타데이터는 건드리지 않는다.
+- Play `phoneScreenshots`는 폴더가 하나라, 폰 기기 폴더가 둘 이상(`slot-duplicate`)이면 `--fastlane`은 중단한다. 하나만 남긴다.
 
 ---
 
@@ -213,6 +233,8 @@ $APPSHOT render --preview                 # 1/3 해상도로 빠르게 확인
 $APPSHOT render                           # 제출용 원본
 $APPSHOT render --all                     # devices × locales 조합 전부
 $APPSHOT status                           # 업로드 전 점검 — 필수 슬롯·해상도·장수·오래된 파일 (문제 있으면 exit 1)
+$APPSHOT export                           # status 통과 시 {output}/_upload/에 올릴 PNG만 복사
+$APPSHOT export --fastlane                # fastlane deliver/supply 폴더 구조로 복사
 ```
 
 앱 화면이 아직 없으면 `render --placeholder`로 자리표시자를 넣어 카피와 레이아웃을 먼저 확정할 수 있다.
@@ -221,7 +243,7 @@ $APPSHOT status                           # 업로드 전 점검 — 필수 슬�
 
 렌더가 끝나면 같은 폴더에 `overview.png`가 함께 생긴다. 전체 장을 스토어에서 넘겨 보는 크기로 한 줄,
 목록 썸네일 크기(높이 300px)로 한 줄 나열한 개요 시트라서 세트의 단조로움·카피 길이 균형·썸네일 가독성을
-한눈에 본다. 제출 대상이 아니므로 업로드할 때는 뺀다. `--no-overview`로 끌 수 있다.
+한눈에 본다. 제출 대상이 아니므로 `export`가 자동으로 뺀다. `--no-overview`로 끌 수 있다.
 
 Claude Code에서는 "앱스토어 스크린샷 만들어줘"라고 요청하면 `SKILL.md`의 절차대로 진행한다.
 플랫폼, 기기, 화면 확보 방법, 레이아웃, 카피, 배경, 프리뷰 수정 여부 같은 결정 지점(D1~D10)마다
@@ -417,9 +439,10 @@ src/
   quality.js             경고 규칙 (가독성·스토어 정책·소스·배경)
   capture.js             simctl / adb / screencapture 래퍼
   status.js              제출 전 점검 — 출력 폴더 스캔과 판정 (순수 로직)
+  export.js              업로드용 내보내기 계획 — 경로 규칙과 스토어 로케일 (순수 로직)
   overview.js            개요 시트 HTML과 캡처
   expand.js              다중 config(devices·locales·카피 맵) 펼치기
-  commands/              doctor · devices · init · layouts · capture · render · status
+  commands/              doctor · devices · init · layouts · capture · render · status · export
 templates/
   base.css               공통 타이포·여백 (--u 단위)
   layout-*.html          레이아웃 5종
