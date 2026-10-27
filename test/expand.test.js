@@ -51,6 +51,7 @@ test('번역이 없으면 기본 로케일 문구로 대체하고 copy-missing �
   assert.equal(missing.length, 1);
   assert.equal(missing[0].screen, 2);
   assert.match(missing[0].message, /headline에 'en' 번역이 없어 'ko' 문구로/);
+  assert.deepEqual([missing[0].field, missing[0].fallback], ['headline', 'ko']);
 });
 
 test('locales에 없는 키는 copy-unknown-locale 경고', () => {

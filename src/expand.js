@@ -30,7 +30,7 @@ export function expandConfig(cfg, { locale, device }) {
   const locales = Array.isArray(cfg.locales) ? cfg.locales : null;
   const sub = (s) => (typeof s === 'string' ? s.replaceAll('{locale}', locale).replaceAll('{device}', device) : s);
   // i가 null이면 특정 장이 아닌 항목(featureGraphic)이다
-  const warn = (i, code, message) => warnings.push({ level: 'warn', screen: i === null ? null : i + 1, code, message });
+  const warn = (i, code, message, extra = {}) => warnings.push({ level: 'warn', screen: i === null ? null : i + 1, code, message, ...extra });
 
   const pick = (value, field, i) => {
     if (typeof value !== 'object' || value === null) return value;
@@ -43,7 +43,7 @@ export function expandConfig(cfg, { locale, device }) {
     const fallback = (locales ?? []).find((l) => typeof value[l] === 'string')
       ?? Object.keys(value).find((k) => typeof value[k] === 'string');
     if (fallback === undefined) return '';
-    warn(i, 'copy-missing', `${field}에 '${locale}' 번역이 없어 '${fallback}' 문구로 렌더했습니다.`);
+    warn(i, 'copy-missing', `${field}에 '${locale}' 번역이 없어 '${fallback}' 문구로 렌더했습니다.`, { field, fallback });
     return value[fallback];
   };
 

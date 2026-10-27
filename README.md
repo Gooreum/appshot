@@ -172,6 +172,7 @@ CSS 값이 아니라 픽셀을 재는 이유가 있다. CSS를 읽으면 내가 
 | `locale-missing` | 에러 | config(`devices`×`locales`) 대상 폴더가 없다 |
 | `placeholder-render` | 에러 | `render --placeholder`가 앱 화면·배경 이미지·브랜드 폰트를 대체해 만든 장이다 (스크린샷·피처 그래픽, config 대상 여부와 무관) |
 | `missing-feature-graphic` | 에러 | Android인데 로케일 폴더에 `feature-graphic.png`가 없다 (Play 게시 필수). 있으면 해상도(`size-mismatch`·`preview-size`)와 `stale`도 본다 |
+| `copy-missing` | 경고 | **현재 config 대상 폴더만** — 번역이 없어 다른 로케일 문구로 렌더된 장 (피처 그래픽 포함) |
 | `count-recommend` · `slot-duplicate` · `locale-diff` · `unknown-entry` | 경고 | Play 폰 4장 미만 / 같은 슬롯 폴더 중복 / 일부 로케일에만 있는 슬롯 / 알 수 없는 폴더·파일 |
 
 에러가 하나라도 있으면 "제출 불가"와 종료 코드 1, 없으면 "제출 준비 완료"와 0이다. 경고만으로는 실패하지 않는다.
@@ -308,7 +309,7 @@ $APPSHOT init --devices iphone-17-pro-max,ipad-pro-13 --locales ko,en
 
 - `headline`·`subhead`는 문자열이어도 된다. 문자열이면 모든 로케일에 같은 문구가 들어간다
 - `source`·`source2`·`theme.background.source`에는 `{locale}`·`{device}` 토큰을 쓸 수 있다. iPhone과 iPad는 캡처가 다르고 현지화된 UI는 로케일마다 캡처가 다르기 때문이다
-- 번역이 빠진 장은 기본 로케일(`locales[0]`) 문구로 렌더하고 `copy-missing` 경고를 낸다. `locales`에 없는 키(`en-US` 같은 오타)는 `copy-unknown-locale` 경고
+- 번역이 빠진 장은 기본 로케일(`locales[0]`) 문구로 렌더하고 `copy-missing` 경고를 낸다. 이 경고는 렌더 후 `appshot status`에서도 다시 보인다. `locales`에 없는 키(`en-US` 같은 오타)는 `copy-unknown-locale` 경고
 - 조합 하나가 실패해도 나머지는 계속 렌더하고, 끝에 실패를 모아 보여준 뒤 종료 코드 1로 끝난다
 - `--all` 없이 `render`하면 기본 조합 하나(`device`·`locale` 스칼라가 있으면 그것, 없으면 각 배열의 첫 번째)만 렌더한다. 프리뷰로 빠르게 볼 때 쓴다
 - `devices`는 모두 `platform`과 같은 플랫폼이어야 한다. iOS + Android처럼 플랫폼이 다르면 config를 나눈다
