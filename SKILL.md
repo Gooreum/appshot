@@ -240,6 +240,9 @@ node ~/.claude/skills/appshot/bin/appshot.mjs render --preview
 node ~/.claude/skills/appshot/bin/appshot.mjs render
 ```
 
+`render --watch`는 사람이 터미널에서 카피·색을 직접 다듬을 때 쓰는 모드다(저장할 때마다 프리뷰 재렌더, Ctrl+C까지 블로킹).
+Claude는 블로킹되므로 기본 흐름에서는 `--preview`를 쓴다. 사용자가 직접 고쳐 보겠다고 하면 이 명령을 안내한다.
+
 Android config에 `featureGraphic`이 있으면 스크린샷 뒤에 로케일마다 피처 그래픽(1024×500)도 렌더한다
 (`{output}/{locale}/feature-graphic.png`, `--only`일 때는 건너뛴다). 테마 배경·폰트·카피 색을 그대로 쓰고,
 `source`가 있으면 오른쪽에 기기 1대를, 없으면 카피만 가운데에 놓는다. 이것도 Read로 열어 카피가 잘리지 않았는지 본다.
@@ -319,7 +322,7 @@ init       appshot.config.json + screens/ 생성   [--platform] [--device | --de
 devices    디바이스와 스토어 규격 목록            [--platform] [--json]
 layouts    레이아웃 5종 설명                     [--json]
 capture    시뮬레이터/기기/맥 창에서 화면 캡처     --platform ios|macos|android [--locale] [--device] [--name] [--force]
-render     스토어 스크린샷 생성                  [--all] [--only 1,3] [--preview] [--placeholder] [--allow-crop] [--no-overview]
+render     스토어 스크린샷 생성                  [--all] [--only 1,3] [--preview] [--watch] [--placeholder] [--allow-crop] [--no-overview]
 status     제출 전 점검 (필수 슬롯·해상도·장수·오래된 파일) [--json] [--ipad]
 ```
 

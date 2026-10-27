@@ -35,7 +35,7 @@ const FONT_FORMAT = {
  * deviceScaleFactor를 지정하지 않으면 환경에 따라 2배 크기로 나오는데,
  * 이것이 스토어 스크린샷 리젝의 가장 흔한 원인이다.
  */
-export async function renderAll(cfg, { preview = false, only = null, placeholder = false, allowCrop = false, overview = true, cwd = process.cwd(), onProgress, onWarnings } = {}) {
+export async function renderAll(cfg, { preview = false, only = null, placeholder = false, allowCrop = false, overview = true, cwd = process.cwd(), browser = null, onProgress, onWarnings } = {}) {
   const device = getDevice(cfg.device);
 
   // 품질 점검은 렌더를 막지 않는다 — 의도적으로 규칙을 깨는 디자인도 있고,
@@ -92,15 +92,18 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
   const outDir = path.resolve(cwd, cfg.output, preview ? '_preview' : '', cfg.locale, cfg.device);
   fs.mkdirSync(outDir, { recursive: true });
 
-  const browser = await chromium.launch();
+  // browser를 넘겨받으면(render --watch) 띄우고 닫는 일은 호출자가 한다
+  const own = !browser;
+  if (own) browser = await chromium.launch();
   const results = [];
   const gateFailed = [];
   const placeholders = []; // [{ index, reasons }] — 자리표시자가 실제로 쓰인 장
   const rendered = new Map(); // index → PNG 버퍼. 개요 시트가 다시 읽지 않게 모아 둔다
   let overviewFile = null;
+  let page = null;
 
   try {
-    const page = await browser.newPage({
+    page = await browser.newPage({
       viewport: { width: canvas.w, height: canvas.h },
       deviceScaleFactor: 1,
     });
@@ -166,7 +169,9 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
       }
     }
   } finally {
-    await browser.close(); // 렌더가 중간에 실패해도 좀비 프로세스를 남기지 않는다
+    // 렌더가 중간에 실패해도 좀비 프로세스를 남기지 않는다. 빌린 브라우저는 페이지만 닫는다
+    if (own) await browser.close();
+    else await page?.close().catch(() => {});
   }
 
   if (warnings.length) onWarnings?.(warnings);
@@ -181,7 +186,7 @@ export async function renderAll(cfg, { preview = false, only = null, placeholder
  * fitDevices와 프레임 게이트는 적용하지 않는다 — 세로 기기를 가로 캔버스에 넣으면 하단이 잘리는
  * 것이 이 레이아웃의 의도라, 게이트의 "잘림" 판정이 매번 실패로 나온다.
  */
-export async function renderFeatureGraphic(cfg, { preview = false, placeholder = false, cwd = process.cwd() } = {}) {
+export async function renderFeatureGraphic(cfg, { preview = false, placeholder = false, cwd = process.cwd(), browser = null } = {}) {
   const device = getDevice(cfg.device);
   const fg = cfg.featureGraphic;
   const warnings = [];
@@ -208,9 +213,11 @@ export async function renderFeatureGraphic(cfg, { preview = false, placeholder =
   const file = path.resolve(cwd, cfg.output, preview ? '_preview' : '', cfg.locale, FEATURE_GRAPHIC.file);
   fs.mkdirSync(path.dirname(file), { recursive: true });
 
-  const browser = await chromium.launch();
+  const own = !browser;
+  if (own) browser = await chromium.launch();
+  let page = null;
   try {
-    const page = await browser.newPage({ viewport: { width: canvas.w, height: canvas.h }, deviceScaleFactor: 1 });
+    page = await browser.newPage({ viewport: { width: canvas.w, height: canvas.h }, deviceScaleFactor: 1 });
     await page.setContent(
       buildFeatureGraphicHTML({ cfg, device, canvas, images: { main, background }, fonts }),
       { waitUntil: 'load' },
@@ -220,7 +227,8 @@ export async function renderFeatureGraphic(cfg, { preview = false, placeholder =
     await hideBakedNotch(page);
     writeMarked(path.dirname(file), FEATURE_GRAPHIC.file, await page.screenshot({ type: 'png' }), reasons);
   } finally {
-    await browser.close();
+    if (own) await browser.close();
+    else await page?.close().catch(() => {});
   }
   return { file, bytes: fs.statSync(file).size, canvas, warnings, placeholder: reasons };
 }
