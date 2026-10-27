@@ -279,3 +279,58 @@ test('자리표시자: 피처 그래픽의 배경 대체도 에러', () => {
   assert.match(p[0].message, /배경 이미지/);
   assert.equal(r.rows.find((x) => x.device === 'feature-graphic').errors, 1);
 });
+
+test('번역 누락: ja에 없는 장은 ja 폴더의 그 파일에만 copy-missing 경고, 제출은 막지 않는다', () => {
+  const cfg = { ...ios(), locales: ['ko', 'ja'] };
+  delete cfg.locale;
+  cfg.screens = cfg.screens.slice(0, 3).map((s, i) => ({ ...s, headline: { ko: `한${i}`, ja: `日${i}` } }));
+  delete cfg.screens[1].headline.ja;
+  const shots = { 'ko/iphone-17-pro-max': [IPHONE, IPHONE, IPHONE], 'ja/iphone-17-pro-max': [IPHONE, IPHONE, IPHONE] };
+  const r = run(project(cfg, shots).cwd, cfg);
+  assert.equal(r.ok, true, JSON.stringify(r.problems));
+  const cm = r.problems.filter((x) => x.code === 'copy-missing');
+  assert.equal(cm.length, 1);
+  assert.deepEqual([cm[0].level, cm[0].locale, cm[0].device, cm[0].file], ['warn', 'ja', 'iphone-17-pro-max', '02.png']);
+  assert.match(cm[0].message, /headline에 'ja' 번역이 없어 'ko' 문구로.*appshot render --all/);
+
+  cfg.screens[1].subhead = { ko: '부제' };
+  const both = run(project(cfg, shots).cwd, cfg);
+  assert.equal(both.problems.filter((x) => x.code === 'copy-missing' && x.file === '02.png').length, 2);
+
+  cfg.screens[1].headline.ja = '日1';
+  cfg.screens[1].subhead.ja = '副題';
+  assert.ok(!codes(run(project(cfg, shots).cwd, cfg)).includes('copy-missing'));
+});
+
+test('번역 누락: 파일이 없는 장은 gap만, config 대상이 아닌 로케일은 판정하지 않는다', () => {
+  const cfg = { ...ios(), locales: ['ko', 'ja'] };
+  delete cfg.locale;
+  cfg.screens = cfg.screens.slice(0, 3).map((s) => ({ ...s, headline: { ko: '한' } }));
+  const shots = {
+    'ko/iphone-17-pro-max': [IPHONE, IPHONE, IPHONE], 'ja/iphone-17-pro-max': [IPHONE, null, IPHONE], 'fr/iphone-17-pro-max': [IPHONE, IPHONE, IPHONE],
+  };
+  const r = run(project(cfg, shots).cwd, cfg);
+  assert.ok(codes(r, 'error').includes('gap'));
+  const cm = r.problems.filter((x) => x.code === 'copy-missing');
+  assert.deepEqual(cm.map((x) => `${x.locale}/${x.file}`), ['ja/01.png', 'ja/03.png']);
+});
+
+test('번역 누락: 피처 그래픽 카피도 copy-missing 경고', () => {
+  const cfg = { ...defaultConfig({ platform: 'android' }), locales: ['ko', 'ja'] };
+  delete cfg.locale;
+  cfg.featureGraphic = { ...cfg.featureGraphic, headline: { ko: '가볍게' } };
+  const shots = { 'ko/pixel-9-pro-xl': [PIXEL, PIXEL, PIXEL, PIXEL], 'ja/pixel-9-pro-xl': [PIXEL, PIXEL, PIXEL, PIXEL] };
+  const r = run(project(cfg, shots, { featureGraphics: { ko: FEATURE, ja: FEATURE } }).cwd, cfg);
+  assert.equal(r.ok, true, JSON.stringify(r.problems));
+  const cm = r.problems.filter((x) => x.code === 'copy-missing');
+  assert.equal(cm.length, 1);
+  assert.deepEqual([cm[0].locale, cm[0].device, cm[0].file], ['ja', null, 'feature-graphic.png']);
+  assert.match(cm[0].message, /featureGraphic\.headline에 'ja' 번역이 없어 'ko'/);
+});
+
+test('기기 폴더의 dotfile(사이드카 등)은 unknown-entry가 아니다', () => {
+  const cfg = ios();
+  const { cwd } = project(cfg, { 'ko/iphone-17-pro-max': [IPHONE, IPHONE, IPHONE] },
+    { files: { 'store-screenshots/ko/iphone-17-pro-max/.appshot-render.json': '{}' } });
+  assert.ok(!codes(run(cwd, cfg)).includes('unknown-entry'));
+});

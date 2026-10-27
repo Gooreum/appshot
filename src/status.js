@@ -12,7 +12,8 @@ import { readMarker } from './placeholder-marker.js';
  *
  * 판정은 두 층이다.
  *   폴더 전체: 로케일마다 필수 슬롯이 채워졌는지, 각 PNG가 규격 해상도인지, 장수가 범위 안인지.
- *   현재 config 대상 조합(listCombos)만: 오래된 파일(stale), config에 없는 장(orphan), 번호 빠짐(gap 에러).
+ *   현재 config 대상 조합(listCombos)만: 오래된 파일(stale), config에 없는 장(orphan), 번호 빠짐(gap 에러),
+ *     번역 누락 대체(copy-missing 경고). stale이 없으면 지금 config로 펼친 카피가 곧 렌더된 카피라 다시 펼쳐 판정한다.
  *   다른 로케일·기기 폴더는 지금 config와 비교할 근거가 없어 stale을 판정하지 않는다(not-current 정보).
  * 슬롯은 storeSlot 문자열로 묶어 본다 — iPhone은 6.9"와 6.5" 중 하나면 되고, Play 폰 3종은 같은 슬롯이다.
  * Play 피처 그래픽은 기기 폴더가 아니라 {locale}/feature-graphic.png라 scanFeatureGraphics로 따로 읽는다.
@@ -132,9 +133,10 @@ export function evaluate(scan, cfg, { cwd = process.cwd(), ipad = false, feature
       const indices = new Set(shots.map((e) => e.index));
       let expectN = Math.max(0, ...indices);
       if (isCurrent) {
-        const { config } = expandConfig(cfg, { locale, device: id });
+        const { config, warnings } = expandConfig(cfg, { locale, device: id });
         expectN = config.screens.length;
         checkCurrent(shots, config, where, cwd, add);
+        checkCopyFallback(shots, warnings, where, allFlag, add);
       }
       const gaps = range(1, expectN).filter((i) => !indices.has(i));
       if (gaps.length) {
@@ -170,7 +172,12 @@ export function evaluate(scan, cfg, { cwd = process.cwd(), ipad = false, feature
       const before = errorCount();
       const entry = featureGraphics?.[locale] ?? null;
       const isCurrent = currentLocales.has(locale);
-      checkFeatureGraphic(entry, isCurrent ? expandConfig(cfg, combos.find((c) => c.locale === locale)).config : null, { locale }, cwd, add);
+      const expanded = isCurrent ? expandConfig(cfg, combos.find((c) => c.locale === locale)) : null;
+      checkFeatureGraphic(entry, expanded?.config ?? null, { locale }, cwd, add);
+      if (entry && expanded) {
+        const fgWarnings = expanded.warnings.filter((w) => w.field?.startsWith('featureGraphic.'));
+        checkCopyFallback([{ ...entry, index: null }], fgWarnings, { locale }, allFlag, add);
+      }
       rows.push({
         locale, device: 'feature-graphic', label: FEATURE_GRAPHIC.label, slot: FEATURE_GRAPHIC.label,
         canvas: canvasLabel(FEATURE_GRAPHIC), count: entry ? 1 : 0, current: isCurrent, errors: errorCount() - before,
@@ -236,6 +243,18 @@ function checkCurrent(shots, config, where, cwd, add) {
     const s = config.screens[e.index - 1];
     const latest = Math.max(base, mtimeOf(abs(s.source)), mtimeOf(abs(s.source2)));
     if (latest > e.mtimeMs) add('error', 'stale', at, "소스 또는 config가 결과보다 나중에 수정됐습니다 → 'appshot render'로 재렌더");
+  }
+}
+
+/**
+ * 현재 config 대상만: 번역이 없어 다른 로케일 문구로 렌더된 장. 파일이 있는 장에만 단다(없는 장은 gap이 잡는다).
+ * expandWarnings: expandConfig의 경고. screen이 shot.index와 같은 copy-missing을 그 파일에 붙인다.
+ */
+function checkCopyFallback(shots, expandWarnings, where, allFlag, add) {
+  for (const w of expandWarnings) {
+    if (w.code !== 'copy-missing') continue;
+    const e = shots.find((s) => s.index === w.screen);
+    if (e) add('warn', 'copy-missing', { ...where, file: e.name }, `${w.message.replace(/\.$/, '')} → config에 번역을 채우고 'appshot render${allFlag}'`);
   }
 }
 
