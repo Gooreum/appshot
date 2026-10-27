@@ -19,3 +19,9 @@ test('--all 은 값을 먹지 않는 boolean 플래그다', () => {
 test('--ipad 는 boolean 플래그다', () => {
   assert.equal(parseArgs(['status', '--ipad']).opts.ipad, true);
 });
+
+test('--fastlane 는 다음 토큰을 먹지 않는 boolean 플래그다', () => {
+  const { opts, positional } = parseArgs(['export', '--fastlane', 'extra']);
+  assert.equal(opts.fastlane, true);
+  assert.deepEqual(positional, ['extra']);
+});

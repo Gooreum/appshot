@@ -311,6 +311,9 @@ Android면 로케일마다 **피처 그래픽**(`{locale}/feature-graphic.png`, 
 **[D11]** "원본 재렌더 (Recommended)" / "남은 파일 정리" / "누락 기기 추가 렌더" / "그대로 둔다"를
 AskUserQuestion으로 묻는다. 경고(`!`)만 있으면 통과이고, 경고는 전달만 한다. `--json`으로 원본 결과를 받을 수 있다.
 
+통과하면 `export`로 업로드 폴더를 만든다 — `{output}/_upload/{locale}/{device}/NN.png`에 올릴 PNG만 복사하고
+`overview.png`·`_preview/`는 뺀다. fastlane을 쓰면 `export --fastlane`(기존 이미지가 있으면 `--force`).
+
 ## 커맨드 요약
 
 ```
@@ -321,6 +324,7 @@ layouts    레이아웃 5종 설명                     [--json]
 capture    시뮬레이터/기기/맥 창에서 화면 캡처     --platform ios|macos|android [--locale] [--device] [--name] [--force]
 render     스토어 스크린샷 생성                  [--all] [--only 1,3] [--preview] [--placeholder] [--allow-crop] [--no-overview]
 status     제출 전 점검 (필수 슬롯·해상도·장수·오래된 파일) [--json] [--ipad]
+export     status 통과 시 업로드용 폴더로 복사         [--fastlane] [--ipad] [--force] [--json]
 ```
 
 ## 참고 문서

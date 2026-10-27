@@ -20,7 +20,9 @@ import { readMarker } from './placeholder-marker.js';
  */
 
 const SHOT_RE = /^(\d{2})\.(png|jpe?g)$/i;
-const IGNORED_DIRS = new Set(['_preview']);
+/** export가 만드는 업로드용 폴더. 복사본은 mtime이 새로 찍혀 stale 판정을 속이므로 스캔에서 뺀다. */
+export const UPLOAD_DIR = '_upload';
+const IGNORED_DIRS = new Set(['_preview', UPLOAD_DIR]);
 const pad2 = (n) => String(n).padStart(2, '0');
 const range = (a, b) => Array.from({ length: Math.max(0, b - a + 1) }, (_, i) => a + i);
 const subdirs = (dir) => fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort();

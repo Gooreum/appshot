@@ -34,19 +34,24 @@ export async function run({ opts }) {
     }
   }
 
-  const MARK = { error: '✗', warn: '!' };
-  const shown = result.problems.filter((p) => p.level !== 'info');
-  if (shown.length) {
-    console.log('');
-    for (const p of shown) {
-      const where = [p.locale, p.device, p.file].filter(Boolean).join('/') || '전체';
-      console.log(`  ${MARK[p.level]} [${where}] ${p.message}`);
-    }
-  }
+  printProblems(result.problems);
 
   const errors = result.problems.filter((p) => p.level === 'error').length;
   const warns = result.problems.filter((p) => p.level === 'warn').length;
   console.log('');
   console.log(result.ok ? `  제출 준비 완료 (경고 ${warns}건)\n` : `  제출 불가 — 에러 ${errors}건, 경고 ${warns}건\n`);
   return result.ok ? 0 : 1;
+}
+
+const MARK = { error: '✗', warn: '!' };
+
+/** 에러·경고 목록 출력(정보는 뺀다). export도 같은 형식으로 쓴다. */
+export function printProblems(problems) {
+  const shown = problems.filter((p) => p.level !== 'info');
+  if (!shown.length) return;
+  console.log('');
+  for (const p of shown) {
+    const where = [p.locale, p.device, p.file].filter(Boolean).join('/') || '전체';
+    console.log(`  ${MARK[p.level]} [${where}] ${p.message}`);
+  }
 }
